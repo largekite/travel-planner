@@ -1,24 +1,16 @@
 # Largekite Travel Planner (Vite + React + TypeScript + Tailwind)
 
-This is a Vercel-ready project skeleton. Your UI lives in `src/index.tsx`.
+- `src/index.tsx` contains the full planner UI.
+- Set `VITE_API_BASE` in your Vercel env (and/or `.env` locally).
 
-## Quick start
-
-```bash
+## Dev
 npm install
 npm run dev
-# open http://localhost:5173
-```
 
-Set your API base in `.env` (optional for local dev):
+## Build
+npm run build
 
-```
-VITE_API_BASE=https://your-backend-domain
-```
-
-## Deploy (Vercel)
-
-- Import this repo in Vercel
-- Build command: `npm run build`
-- Output directory: `dist`
-- Environment variable: `VITE_API_BASE=https://your-backend-domain`
+## Vercel
+- Build command: npm run build
+- Output dir: dist
+- Env: VITE_API_BASE=https://your-backend
