@@ -1,25 +1,24 @@
+# Largekite Travel Planner (Vite + React + TypeScript + Tailwind)
 
-# Largekite Trip Planner (Vite + React + TS + Tailwind)
-
-Single-page React app wrapped with Vite and Tailwind. Your UI talks to an external API base via `VITE_API_BASE`.
+This is a Vercel-ready project skeleton. Your UI lives in `src/index.tsx`.
 
 ## Quick start
+
 ```bash
-npm i
-cp .env.example .env
-# edit .env and set VITE_API_BASE=... (or leave blank to see "API not configured")
+npm install
 npm run dev
+# open http://localhost:5173
 ```
 
-## Build
-```bash
-npm run build
-npm run preview
+Set your API base in `.env` (optional for local dev):
+
+```
+VITE_API_BASE=https://your-backend-domain
 ```
 
-## Deploy on Vercel
-- Import the repo → Framework: **Vite** (auto-detected)
-- Build Command: `npm run build` (auto)
-- Output: `dist` (auto)
-- Add env var `VITE_API_BASE` in Project Settings → Environment Variables (Production + Preview)
+## Deploy (Vercel)
 
+- Import this repo in Vercel
+- Build command: `npm run build`
+- Output directory: `dist`
+- Environment variable: `VITE_API_BASE=https://your-backend-domain`
