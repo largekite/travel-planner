@@ -18,10 +18,11 @@ import {
  ****************************************************/
 
 // Resolve API base from global or Vite env. Avoid `process` to keep TS happy in Vite.
-const API_BASE: string | undefined =
+const API_BASE: string =
   (typeof window !== "undefined" && (window as any).__API_BASE__) ||
   (typeof import.meta !== "undefined" && (import.meta as any)?.env?.VITE_API_BASE) ||
-  undefined;
+  (typeof window !== "undefined" ? window.location.origin : "");
+
 
 // ---------------------------------
 // Types & constants
