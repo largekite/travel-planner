@@ -23,12 +23,6 @@ import {
 
 /****************************************************
  * Largekite - Trip Planner (Polished UI)
- * - Card-style suggestions
- * - Modal scroll
- * - Slot-level refresh
- * - Distance/time chips
- * - Nicer geolocation error
- * - Light vibe tint on top bar
  ****************************************************/
 
 // Same-origin API base
@@ -77,7 +71,7 @@ type ApiSuggestion = {
   lat?: number;
   lng?: number;
   desc?: string;
-  meta?: string; // e.g. "9 min walk"
+  meta?: string;
   ratings?: {
     combined?: number;
     yelp?: number;
@@ -113,7 +107,7 @@ const VIBE_BG: Record<Vibe, string> = {
   adventurous: "from-emerald-50/60 to-white",
 };
 
-// map projection defaults (St. Louis-ish, but keeps our SVG working)
+// map projection defaults
 const STL_BOUNDS = {
   minLat: 38.45,
   maxLat: 38.8,
@@ -122,7 +116,7 @@ const STL_BOUNDS = {
 };
 
 // ---------------------------------
-// Detail text builder (UI fallback)
+// Detail text builder
 // ---------------------------------
 const VIBE_MEAL_TIPS: Record<Vibe, string> = {
   romantic: "ask for patio or booth; share a starter; golden-hour timing",
@@ -482,7 +476,7 @@ export default function PlannerRedesign() {
   const [apiLatency, setApiLatency] = useState<number | null>(null);
   const [apiMsg, setApiMsg] = useState<string | null>(null);
 
-  // debug fetch info
+  // debug
   const [lastFetchUrl, setLastFetchUrl] = useState<string>("");
   const [lastResultCount, setLastResultCount] = useState<number>(0);
 
@@ -500,7 +494,6 @@ export default function PlannerRedesign() {
     setCurrentDay((d) => Math.max(1, Math.min(daysCount, d)));
   }, [daysCount]);
 
-  // helpers
   function setSlot(dayIndex1Based: number, key: SlotKey, value?: SelectedItem) {
     if (key === "hotel") {
       setHotel(value || null);
@@ -617,7 +610,7 @@ export default function PlannerRedesign() {
     return () => ctrl.abort();
   }, [hotelQuery, city]);
 
-  // suggestions for slots
+  // build params used for slot fetch
   function buildSlotParams() {
     const noun =
       slotKey === "hotel" ? "hotels or areas" : `${slotKey} places`;
@@ -644,6 +637,7 @@ export default function PlannerRedesign() {
     return params;
   }
 
+  // suggestions for slots
   useEffect(() => {
     if (!slotModalOpen) return;
     const ctrl = new AbortController();
@@ -677,11 +671,11 @@ export default function PlannerRedesign() {
         // sort client-side if needed
         if (sortMode === "rating") {
           items = items.sort(
-            (a, b) => (b.ratings?.google || 0) - (a.ratings?.google || 0)
+            (a: ApiSuggestion, b: ApiSuggestion) =>
+              (b.ratings?.google || 0) - (a.ratings?.google || 0)
           );
         } else if (sortMode === "distance") {
-          items = items.sort((a, b) => {
-            // items coming from server already filtered, but we can sort by meta minutes if present
+          items = items.sort((a: ApiSuggestion, b: ApiSuggestion) => {
             const am = a.meta?.match(/(\d+)\s*min/)?.[1];
             const bm = b.meta?.match(/(\d+)\s*min/)?.[1];
             if (am && bm) return Number(am) - Number(bm);
@@ -718,6 +712,7 @@ export default function PlannerRedesign() {
     setSlotModalOpen(true);
   }
 
+  // rebuild day
   async function rebuildDayForVibe(dayIndex1Based: number) {
     const cats: SlotKey[] = [
       "breakfast",
@@ -925,7 +920,7 @@ export default function PlannerRedesign() {
     );
   }
 
-  // basic sanity
+  // sanity
   useEffect(() => {
     try {
       console.assert(
@@ -948,7 +943,13 @@ export default function PlannerRedesign() {
         <div className="rounded-2xl bg-white/80 backdrop-blur border p-4 flex flex-wrap items-center gap-3 shadow-sm">
           <div className="flex items-center gap-2 mr-auto">
             <div className="text-lg font-semibold tracking-tight">
-              Largekite — {vibe === "romantic" ? "Romantic" : vibe === "family" ? "Family" : "Adventurous"} trip plan
+              Largekite —{" "}
+              {vibe === "romantic"
+                ? "Romantic"
+                : vibe === "family"
+                ? "Family"
+                : "Adventurous"}{" "}
+              trip plan
             </div>
             <span
               className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-xs ${
