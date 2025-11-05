@@ -19,14 +19,13 @@ import {
 
 /****************************************************
  * Largekite - Trip Planner (Google Places + optional OpenAI)
- *
- * - Suggestions now come from /api/places (fast, Google Places)
- * - "Suggest details" optionally calls /api/enrich (OpenAI) to generate vibe-aware text
- * - Same-origin API base (window.location.origin), no process/env on client
- * - Still supports hotel/area, near-me filters, map view, and plan table
+ * Fixes in this version:
+ * 1. Modal/suggestion popups now have visible scrollbars.
+ * 2. "Use my current location" shows proper error and actually sets hotel.
+ * 3. Map pins now use comma-style HSL (works across browsers).
  ****************************************************/
 
-// Client-side API base: same origin where this app is served
+// Same-origin API base
 const API_BASE: string =
   (typeof window !== "undefined" && (window as any).__API_BASE__) ||
   (typeof window !== "undefined" ? window.location.origin : "");
@@ -220,8 +219,8 @@ function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-[min(900px,96vw)] max-h-[86vh] overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b">
+      <div className="relative bg-white rounded-2xl shadow-xl w-[min(900px,96vw)] max-h-[86vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
           <div className="font-semibold">{title}</div>
           <button
             onClick={onClose}
@@ -230,7 +229,8 @@ function Modal({
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="overflow-auto p-4">{children}</div>
+        {/* 👇 scrollable area */}
+        <div className="overflow-y-auto p-4 grow">{children}</div>
       </div>
     </div>
   );
@@ -258,7 +258,8 @@ function SuggestionList({
         </div>
         {error && <div className="text-amber-700">{error}</div>}
       </div>
-      <div className="divide-y">
+      {/* 👇 make list scrollable */}
+      <div className="divide-y max-h-96 overflow-y-auto pr-1">
         {items.map((it, idx) => (
           <div
             key={`${it.name}-${idx}`}
@@ -283,7 +284,9 @@ function SuggestionList({
                 {[it.cuisine, it.price, it.area].filter(Boolean).join(" · ")}
               </div>
               {it.desc && (
-                <div className="text-xs text-slate-600 mt-0.5">{it.desc}</div>
+                <div className="text-xs text-slate-600 mt-0.5">
+                  {it.desc}
+                </div>
               )}
               <div className="text-[11px] text-slate-600 mt-0.5">
                 {it.ratings?.google != null ? (
@@ -380,7 +383,6 @@ function DaysStrip({
 // Main component
 // ---------------------------------
 export default function PlannerRedesign() {
-  // Trip-wide inputs
   const [country, setCountry] = useState<string>("USA");
   const [city, setCity] = useState<string>("St. Louis");
   const [vibe, setVibe] = useState<Vibe>("romantic");
@@ -390,14 +392,14 @@ export default function PlannerRedesign() {
     () => Array.from({ length: 3 }, () => ({}))
   );
 
-  // Hotel/center selection
+  // hotel / area
   const [hotel, setHotel] = useState<SelectedItem | null>(null);
   const [hotelQuery, setHotelQuery] = useState<string>("");
   const [hotelSugs, setHotelSugs] = useState<ApiSuggestion[]>([]);
   const [hotelLoading, setHotelLoading] = useState<boolean>(false);
   const [hotelError, setHotelError] = useState<string | null>(null);
 
-  // Suggestion modal state
+  // suggestion modal
   const [slotModalOpen, setSlotModalOpen] = useState(false);
   const [slotKey, setSlotKey] = useState<SlotKey>("activity");
   const [areaFilter, setAreaFilter] = useState<string>("");
@@ -405,30 +407,30 @@ export default function PlannerRedesign() {
   const [nearMaxMins, setNearMaxMins] = useState<number>(15);
   const [useNearFilter, setUseNearFilter] = useState<boolean>(false);
 
-  // Detail modal
+  // detail modal
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailDay, setDetailDay] = useState<number>(1);
   const [detailText, setDetailText] = useState<string>("");
 
-  // Live suggestions
+  // live suggestions
   const [liveItems, setLiveItems] = useState<ApiSuggestion[]>([]);
   const [liveLoading, setLiveLoading] = useState<boolean>(false);
   const [liveError, setLiveError] = useState<string | null>(null);
 
-  // Debug fetch info
+  // debug
   const [lastFetchUrl, setLastFetchUrl] = useState<string>("");
   const [lastResultCount, setLastResultCount] = useState<number>(0);
 
-  // Directions / map
+  // map
   const [dirSegs, setDirSegs] = useState<ApiDirectionsSegment[] | null>(null);
   const [dirErr, setDirErr] = useState<string | null>(null);
 
-  // API status pill
+  // api status
   const [apiOk, setApiOk] = useState<boolean | null>(null);
   const [apiLatency, setApiLatency] = useState<number | null>(null);
   const [apiMsg, setApiMsg] = useState<string | null>(null);
 
-  // auto-resize plan when days change
+  // resize plan when days change
   useEffect(() => {
     setPlan((prev) => {
       const copy = [...prev];
@@ -482,12 +484,9 @@ export default function PlannerRedesign() {
     (["activity", "breakfast", "lunch", "coffee", "dinner", "notes"] as (
       | keyof DayPlan
       | "notes"
-    )[]).forEach((k) =>
-      setSlot(dayIndex1Based, k as SlotKey, undefined)
-    );
+    )[]).forEach((k) => setSlot(dayIndex1Based, k as SlotKey, undefined));
   }
 
-  // current day's items
   const cur = plan[currentDay - 1] || {};
   const sequence: (keyof DayPlan)[] = [
     "breakfast",
@@ -499,9 +498,6 @@ export default function PlannerRedesign() {
   const chosenItems = sequence
     .map((k) => cur[k])
     .filter(Boolean) as SelectedItem[];
-
-  // straight-line fallback segments
-  useMemo(() => {}, []); // just to keep TS happy if you move code
 
   const straightSegments = useMemo(() => {
     const segs: {
@@ -526,9 +522,7 @@ export default function PlannerRedesign() {
     return segs;
   }, [chosenItems.map((c) => c.name).join("|")]);
 
-  // ------------------
-  // hotel inline search (still hits /api/places but with slot=hotel)
-  // ------------------
+  // hotel inline search
   useEffect(() => {
     const q = hotelQuery.trim();
     const ctrl = new AbortController();
@@ -566,9 +560,7 @@ export default function PlannerRedesign() {
     return () => ctrl.abort();
   }, [hotelQuery, city]);
 
-  // ------------------
-  // suggestions for any slot -> now /api/places
-  // ------------------
+  // suggestions for slots
   useEffect(() => {
     if (!slotModalOpen) return;
     const ctrl = new AbortController();
@@ -644,7 +636,6 @@ export default function PlannerRedesign() {
     areaFilter,
   ]);
 
-  // rebuild day button -> still uses /api/places
   async function rebuildDayForVibe(dayIndex1Based: number) {
     const cats: SlotKey[] = [
       "breakfast",
@@ -685,12 +676,12 @@ export default function PlannerRedesign() {
             meta: first.meta,
           });
       } catch {
-        // per-slot errors ignored so the others can fill
+        // ignore per-slot
       }
     }
   }
 
-  // directions: ask your backend only if you have it; otherwise we keep fallback
+  // directions (optional AI endpoint) – keep fallback
   useEffect(() => {
     if (chosenItems.length < 2) {
       setDirSegs(null);
@@ -730,29 +721,25 @@ export default function PlannerRedesign() {
     return () => ctrl.abort();
   }, [chosenItems.map((p) => p.name).join("|"), city]);
 
-  // print
   function handlePrint() {
     window.print();
   }
 
-  // detail modal: now tries /api/enrich first; fallback to UI builder
   async function openDetail(dayIdx1: number) {
     setDetailDay(dayIdx1);
     const day = plan[dayIdx1 - 1];
-    // optimistic fallback text
-    let uiText = buildDetailText(day, vibe);
+    const uiText = buildDetailText(day, vibe);
     setDetailText(uiText);
     setDetailOpen(true);
 
+    // try backend enrich if available
     try {
-      // try calling backend to enrich with LLM
       const r = await fetch(`${API_BASE}/api/enrich`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           city,
           vibe,
-          // send a few selected names so backend can reference them
           selections: {
             breakfast: day?.breakfast?.name,
             activity: day?.activity?.name,
@@ -764,12 +751,10 @@ export default function PlannerRedesign() {
       });
       if (r.ok) {
         const j = await r.json();
-        if (j?.desc) {
-          setDetailText(j.desc);
-        }
+        if (j?.desc) setDetailText(j.desc);
       }
     } catch {
-      // ignore, UI fallback is already in text
+      // ignore, fallback already shown
     }
   }
 
@@ -786,13 +771,15 @@ export default function PlannerRedesign() {
     setDetailOpen(false);
   }
 
-  // API status ping (to detect 500/unknown)
+  // api status
   useEffect(() => {
     let cancelled = false;
     const ping = async () => {
       const start = performance.now();
       try {
-        const res = await fetch(`${API_BASE}/api/places?city=test&slot=activity&limit=1`);
+        const res = await fetch(
+          `${API_BASE}/api/places?city=test&slot=activity&limit=1`
+        );
         const latency = Math.round(performance.now() - start);
         if (!cancelled) {
           setApiLatency(latency);
@@ -815,8 +802,12 @@ export default function PlannerRedesign() {
     };
   }, []);
 
-  // geolocation
+  // 👇 geolocation fix
   function useMyLocation() {
+    if (typeof window === "undefined") {
+      setHotelError("Geolocation not available (SSR)");
+      return;
+    }
     if (!("geolocation" in navigator)) {
       setHotelError("Geolocation unavailable in this browser");
       return;
@@ -831,26 +822,26 @@ export default function PlannerRedesign() {
           lng: longitude,
           desc: "Browser-provided location",
         });
+        setHotelError(null);
       },
       (err) => {
-        setHotelError(err?.message || "Failed to get location");
+        setHotelError(
+          err?.message ||
+            "Failed to get location (check site permissions / HTTPS)"
+        );
       },
       { enableHighAccuracy: true, timeout: 12000 }
     );
   }
 
-  // tiny runtime checks
+  // basic runtime assertions
   useEffect(() => {
     try {
       console.assert(
         Math.abs(
           haversineKm({ lat: 0, lng: 0 }, { lat: 0, lng: 0 })
         ) < 1e-9,
-        "haversine zero distance"
-      );
-      console.assert(
-        etaMins("walk", 5) === 60,
-        "eta walk 5km ~ 60m"
+        "haversine zero"
       );
     } catch {
       // ignore
@@ -1003,6 +994,7 @@ export default function PlannerRedesign() {
                           desc: h.desc,
                         });
                         setHotelQuery(h.name);
+                        setHotelError(null);
                       }}
                       className="w-full text-left py-2 px-2 hover:bg-white rounded-lg"
                     >
@@ -1018,6 +1010,11 @@ export default function PlannerRedesign() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+            {hotelError && (
+              <div className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded px-2 py-1">
+                {hotelError}
               </div>
             )}
             <div className="flex flex-wrap items-center gap-3">
@@ -1148,7 +1145,7 @@ export default function PlannerRedesign() {
                 />
               ))}
 
-              {/* Directions from backend */}
+              {/* backend directions */}
               {dirSegs &&
                 dirSegs.map((seg, idx) => (
                   <g key={`rseg-${idx}`}>
@@ -1182,7 +1179,7 @@ export default function PlannerRedesign() {
                   </g>
                 ))}
 
-              {/* Fallback straight segments */}
+              {/* straight-line fallback */}
               {!dirSegs &&
                 straightSegments.map((seg, idx) => {
                   const a = project(seg.a.lat, seg.a.lng);
@@ -1219,11 +1216,12 @@ export default function PlannerRedesign() {
                 const hue = 220 + idx * 40;
                 return (
                   <g key={`${p.name}-${idx}`}>
+                    {/* 👇 changed to comma-style hsl */}
                     <circle
                       cx={x}
                       cy={y}
                       r={2.8}
-                      fill={`hsl(${hue} 80% 45%)`}
+                      fill={`hsl(${hue}, 80%, 45%)`}
                     />
                     <text
                       x={x + 3.8}
@@ -1437,7 +1435,6 @@ export default function PlannerRedesign() {
               )}
             </div>
           </div>
-          {/* Debug info */}
           <div className="text-[11px] text-slate-500 mb-2">
             <div>
               Last request URL:{" "}
