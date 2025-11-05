@@ -15,14 +15,20 @@ import {
   Search,
   Crosshair,
   Wifi,
+  RefreshCcw,
+  Share2,
+  MapPin,
+  Filter,
 } from "lucide-react";
 
 /****************************************************
- * Largekite - Trip Planner (Google Places + optional OpenAI)
- * Fixes in this version:
- * 1. Modal/suggestion popups now have visible scrollbars.
- * 2. "Use my current location" shows proper error and actually sets hotel.
- * 3. Map pins now use comma-style HSL (works across browsers).
+ * Largekite - Trip Planner (Polished UI)
+ * - Card-style suggestions
+ * - Modal scroll
+ * - Slot-level refresh
+ * - Distance/time chips
+ * - Nicer geolocation error
+ * - Light vibe tint on top bar
  ****************************************************/
 
 // Same-origin API base
@@ -71,7 +77,7 @@ type ApiSuggestion = {
   lat?: number;
   lng?: number;
   desc?: string;
-  meta?: string;
+  meta?: string; // e.g. "9 min walk"
   ratings?: {
     combined?: number;
     yelp?: number;
@@ -90,7 +96,6 @@ type AiResponse = {
     mode: "walk" | "drive";
     path?: [number, number][];
   }[];
-  notes?: string;
 };
 
 type ApiDirectionsSegment = {
@@ -101,8 +106,23 @@ type ApiDirectionsSegment = {
   to: string;
 };
 
+// vibe colors
+const VIBE_BG: Record<Vibe, string> = {
+  romantic: "from-rose-50/60 to-white",
+  family: "from-amber-50/60 to-white",
+  adventurous: "from-emerald-50/60 to-white",
+};
+
+// map projection defaults (St. Louis-ish, but keeps our SVG working)
+const STL_BOUNDS = {
+  minLat: 38.45,
+  maxLat: 38.8,
+  minLng: -90.75,
+  maxLng: -90.05,
+};
+
 // ---------------------------------
-// Vibe tips
+// Detail text builder (UI fallback)
 // ---------------------------------
 const VIBE_MEAL_TIPS: Record<Vibe, string> = {
   romantic: "ask for patio or booth; share a starter; golden-hour timing",
@@ -116,9 +136,6 @@ const VIBE_ACTIVITY_TIPS: Record<Vibe, string> = {
   adventurous: "add an extra loop; arrive early for first slots",
 };
 
-// ---------------------------------
-// Detail text builder (UI-side fallback)
-// ---------------------------------
 function genericDishFallback(name: string): string[] {
   const n = name.toLowerCase();
   if (n.includes("bbq")) return ["Ribs", "Pulled pork", "Baked beans"];
@@ -155,12 +172,6 @@ function buildDetailText(d: DayPlan | undefined, vibe: Vibe): string {
 // ---------------------------------
 // Map helpers
 // ---------------------------------
-const STL_BOUNDS = {
-  minLat: 38.45,
-  maxLat: 38.8,
-  minLng: -90.75,
-  maxLng: -90.05,
-};
 function project(lat?: number, lng?: number) {
   if (lat == null || lng == null)
     return { x: -999, y: -999, hidden: true };
@@ -173,6 +184,7 @@ function project(lat?: number, lng?: number) {
     hidden: nx < 0 || nx > 1 || ny < 0 || ny > 1,
   };
 }
+
 function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
@@ -185,10 +197,12 @@ function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: num
   const c = 2 * Math.atan2(Math.sqrt(sa), Math.sqrt(1 - sa));
   return R * c;
 }
+
 function etaMins(mode: "walk" | "drive", km: number) {
   const speedKmh = mode === "walk" ? 5 : 35;
   return Math.round((km / speedKmh) * 60);
 }
+
 function toSvgPath(path: [number, number][]): string {
   const pts = path.map(([lat, lng]) => project(lat, lng));
   const vis = pts.filter((p) => !p.hidden);
@@ -202,7 +216,7 @@ function toSvgPath(path: [number, number][]): string {
 }
 
 // ---------------------------------
-// Small UI components
+// UI components
 // ---------------------------------
 function Modal({
   open,
@@ -219,8 +233,8 @@ function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-[min(900px,96vw)] max-h-[86vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
+      <div className="relative bg-white rounded-2xl shadow-xl w-[min(920px,96vw)] max-h-[86vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-slate-50/60 backdrop-blur">
           <div className="font-semibold">{title}</div>
           <button
             onClick={onClose}
@@ -229,8 +243,74 @@ function Modal({
             <X className="w-5 h-5" />
           </button>
         </div>
-        {/* 👇 scrollable area */}
         <div className="overflow-y-auto p-4 grow">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function SuggestionCard({
+  item,
+  index,
+  onChoose,
+}: {
+  item: ApiSuggestion;
+  index: number;
+  onChoose: (item: ApiSuggestion) => void;
+}) {
+  return (
+    <div className="rounded-xl border bg-white/80 hover:bg-indigo-50/30 transition-all p-3 flex justify-between gap-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <div className="text-xs text-slate-400 w-5 shrink-0">{index}.</div>
+          {item.url ? (
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-slate-900 hover:text-indigo-700 truncate"
+            >
+              {item.name}
+            </a>
+          ) : (
+            <div className="font-medium text-slate-900 truncate">
+              {item.name}
+            </div>
+          )}
+        </div>
+        <div className="text-[11px] text-slate-500 mt-1">
+          {[item.cuisine, item.price, item.area].filter(Boolean).join(" · ")}
+        </div>
+        {item.desc && (
+          <div className="text-[11px] text-slate-600 mt-1 line-clamp-2">
+            {item.desc}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-1 mt-2">
+          {item.ratings?.google != null && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-[10px] px-2 py-1 text-slate-600">
+              ★ {item.ratings.google.toFixed(1)} Google
+            </span>
+          )}
+          {typeof item.ratings?.googleReviews === "number" && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-[10px] px-2 py-1 text-slate-600">
+              {item.ratings.googleReviews} reviews
+            </span>
+          )}
+          {item.meta && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 text-[10px] px-2 py-1 text-indigo-700">
+              <MapPin className="w-3 h-3" /> {item.meta}
+            </span>
+          )}
+        </div>
+      </div>
+      <div>
+        <button
+          onClick={() => onChoose(item)}
+          className="px-3 py-1.5 rounded-lg border bg-indigo-50 hover:bg-indigo-100 text-xs"
+        >
+          Use
+        </button>
       </div>
     </div>
   );
@@ -251,69 +331,21 @@ function SuggestionList({
 }) {
   return (
     <div>
-      <div className="flex items-center justify-between mb-2 text-xs">
-        <div className="text-slate-500">
-          {usingApi ? "Live data (Places)" : "API not configured"}
-          {loading ? " · loading..." : ""}
-        </div>
+      <div className="flex items-center justify-between mb-2 text-[11px] text-slate-500">
+        <div>{usingApi ? "Live data" : "API not configured"}</div>
         {error && <div className="text-amber-700">{error}</div>}
       </div>
-      {/* 👇 make list scrollable */}
-      <div className="divide-y max-h-96 overflow-y-auto pr-1">
+      <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
         {items.map((it, idx) => (
-          <div
+          <SuggestionCard
             key={`${it.name}-${idx}`}
-            className="py-3 flex items-start justify-between gap-3"
-          >
-            <div>
-              {it.url ? (
-                <a
-                  href={it.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium text-blue-700 hover:underline"
-                >
-                  {idx + 1}. {it.name}
-                </a>
-              ) : (
-                <span className="font-medium">
-                  {idx + 1}. {it.name}
-                </span>
-              )}
-              <div className="text-xs text-slate-500">
-                {[it.cuisine, it.price, it.area].filter(Boolean).join(" · ")}
-              </div>
-              {it.desc && (
-                <div className="text-xs text-slate-600 mt-0.5">
-                  {it.desc}
-                </div>
-              )}
-              <div className="text-[11px] text-slate-600 mt-0.5">
-                {it.ratings?.google != null ? (
-                  <>Google {Number(it.ratings.google).toFixed(1)}</>
-                ) : null}
-                {it.ratings?.googleReviews ? (
-                  <> · {it.ratings.googleReviews} reviews</>
-                ) : null}
-              </div>
-              {it.meta && (
-                <div className="text-[11px] text-slate-500 mt-0.5">
-                  {it.meta}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onChoose(it)}
-                className="px-3 py-1.5 rounded-lg border bg-indigo-50 hover:bg-indigo-100"
-              >
-                Use
-              </button>
-            </div>
-          </div>
+            item={it}
+            index={idx + 1}
+            onChoose={onChoose}
+          />
         ))}
         {!loading && items.length === 0 && (
-          <div className="py-8 text-center text-sm text-slate-500">
+          <div className="py-8 text-center text-sm text-slate-400">
             No matches. Try changing vibe, area, or near-me filter.
           </div>
         )}
@@ -326,27 +358,48 @@ function SlotButton({
   label,
   value,
   onClick,
+  onRefresh,
 }: {
   label: string;
   value?: SelectedItem;
   onClick: () => void;
+  onRefresh?: () => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className="w-full text-left px-3 py-2 rounded-lg border hover:border-indigo-300 hover:bg-indigo-50/40"
-    >
-      <div className="text-[11px] text-slate-500">{label}</div>
-      <div className="font-medium text-slate-800 truncate flex items-center gap-2">
-        {!value?.name ? (
-          <>
-            <Plus className="w-4 h-4" /> Choose
-          </>
-        ) : (
-          value.name
+    <div className="flex gap-2">
+      <button
+        onClick={onClick}
+        className="flex-1 text-left px-3 py-2 rounded-lg border hover:border-indigo-300 hover:bg-indigo-50/40 transition-all"
+      >
+        <div className="text-[11px] text-slate-500 flex items-center gap-1">
+          {label}
+        </div>
+        <div className="font-medium text-slate-800 truncate flex items-center gap-2 text-sm mt-1">
+          {!value?.name ? (
+            <>
+              <Plus className="w-4 h-4" /> Choose
+            </>
+          ) : (
+            value.name
+          )}
+        </div>
+        {value?.meta && (
+          <div className="mt-1 text-[10px] inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700">
+            <MapPin className="w-3 h-3" />
+            {value.meta}
+          </div>
         )}
-      </div>
-    </button>
+      </button>
+      {onRefresh && (
+        <button
+          onClick={onRefresh}
+          className="p-2 rounded-lg border bg-white hover:bg-slate-50 text-slate-500"
+          title="Refresh suggestions"
+        >
+          <RefreshCcw className="w-4 h-4" />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -365,7 +418,7 @@ function DaysStrip({
         <button
           key={d}
           onClick={() => setCurrentDay(d)}
-          className={`px-3 py-1.5 rounded-lg border text-sm ${
+          className={`px-3 py-1.5 rounded-lg border text-sm transition-all ${
             currentDay === d
               ? "bg-indigo-600 text-white border-indigo-600"
               : "bg-white"
@@ -392,7 +445,7 @@ export default function PlannerRedesign() {
     () => Array.from({ length: 3 }, () => ({}))
   );
 
-  // hotel / area
+  // hotel
   const [hotel, setHotel] = useState<SelectedItem | null>(null);
   const [hotelQuery, setHotelQuery] = useState<string>("");
   const [hotelSugs, setHotelSugs] = useState<ApiSuggestion[]>([]);
@@ -406,6 +459,9 @@ export default function PlannerRedesign() {
   const [nearMode, setNearMode] = useState<"walk" | "drive">("walk");
   const [nearMaxMins, setNearMaxMins] = useState<number>(15);
   const [useNearFilter, setUseNearFilter] = useState<boolean>(false);
+  const [sortMode, setSortMode] = useState<"default" | "distance" | "rating">(
+    "default"
+  );
 
   // detail modal
   const [detailOpen, setDetailOpen] = useState(false);
@@ -417,11 +473,7 @@ export default function PlannerRedesign() {
   const [liveLoading, setLiveLoading] = useState<boolean>(false);
   const [liveError, setLiveError] = useState<string | null>(null);
 
-  // debug
-  const [lastFetchUrl, setLastFetchUrl] = useState<string>("");
-  const [lastResultCount, setLastResultCount] = useState<number>(0);
-
-  // map
+  // map directions
   const [dirSegs, setDirSegs] = useState<ApiDirectionsSegment[] | null>(null);
   const [dirErr, setDirErr] = useState<string | null>(null);
 
@@ -429,6 +481,10 @@ export default function PlannerRedesign() {
   const [apiOk, setApiOk] = useState<boolean | null>(null);
   const [apiLatency, setApiLatency] = useState<number | null>(null);
   const [apiMsg, setApiMsg] = useState<string | null>(null);
+
+  // debug fetch info
+  const [lastFetchUrl, setLastFetchUrl] = useState<string>("");
+  const [lastResultCount, setLastResultCount] = useState<number>(0);
 
   // resize plan when days change
   useEffect(() => {
@@ -444,6 +500,7 @@ export default function PlannerRedesign() {
     setCurrentDay((d) => Math.max(1, Math.min(daysCount, d)));
   }, [daysCount]);
 
+  // helpers
   function setSlot(dayIndex1Based: number, key: SlotKey, value?: SelectedItem) {
     if (key === "hotel") {
       setHotel(value || null);
@@ -561,10 +618,7 @@ export default function PlannerRedesign() {
   }, [hotelQuery, city]);
 
   // suggestions for slots
-  useEffect(() => {
-    if (!slotModalOpen) return;
-    const ctrl = new AbortController();
-
+  function buildSlotParams() {
     const noun =
       slotKey === "hotel" ? "hotels or areas" : `${slotKey} places`;
     const q =
@@ -587,6 +641,13 @@ export default function PlannerRedesign() {
       lng: hotel?.lng != null ? String(hotel.lng) : "",
       area: areaFilter || "",
     });
+    return params;
+  }
+
+  useEffect(() => {
+    if (!slotModalOpen) return;
+    const ctrl = new AbortController();
+    const params = buildSlotParams();
 
     setLiveLoading(true);
     setLiveError(null);
@@ -599,7 +660,7 @@ export default function PlannerRedesign() {
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const data = await r.json();
-        const items = (Array.isArray(data.items) ? data.items : []).map(
+        let items = (Array.isArray(data.items) ? data.items : []).map(
           (it: any): ApiSuggestion => ({
             name: it.name,
             url: it.url,
@@ -613,6 +674,20 @@ export default function PlannerRedesign() {
             ratings: it.ratings || undefined,
           })
         );
+        // sort client-side if needed
+        if (sortMode === "rating") {
+          items = items.sort(
+            (a, b) => (b.ratings?.google || 0) - (a.ratings?.google || 0)
+          );
+        } else if (sortMode === "distance") {
+          items = items.sort((a, b) => {
+            // items coming from server already filtered, but we can sort by meta minutes if present
+            const am = a.meta?.match(/(\d+)\s*min/)?.[1];
+            const bm = b.meta?.match(/(\d+)\s*min/)?.[1];
+            if (am && bm) return Number(am) - Number(bm);
+            return 0;
+          });
+        }
         setLiveItems(items);
         setLastResultCount(items.length);
       })
@@ -634,7 +709,14 @@ export default function PlannerRedesign() {
     hotel?.lat,
     hotel?.lng,
     areaFilter,
+    sortMode,
   ]);
+
+  // refresh single slot from main UI
+  async function refreshSingleSlot(slot: SlotKey) {
+    setSlotKey(slot);
+    setSlotModalOpen(true);
+  }
 
   async function rebuildDayForVibe(dayIndex1Based: number) {
     const cats: SlotKey[] = [
@@ -681,14 +763,13 @@ export default function PlannerRedesign() {
     }
   }
 
-  // directions (optional AI endpoint) – keep fallback
+  // directions call (optional)
   useEffect(() => {
     if (chosenItems.length < 2) {
       setDirSegs(null);
       setDirErr(null);
       return;
     }
-
     const coordsStr = chosenItems
       .map((p) => `${p.lat},${p.lng},${p.name}`)
       .join(";");
@@ -731,8 +812,7 @@ export default function PlannerRedesign() {
     const uiText = buildDetailText(day, vibe);
     setDetailText(uiText);
     setDetailOpen(true);
-
-    // try backend enrich if available
+    // optional backend enrich
     try {
       const r = await fetch(`${API_BASE}/api/enrich`, {
         method: "POST",
@@ -754,7 +834,7 @@ export default function PlannerRedesign() {
         if (j?.desc) setDetailText(j.desc);
       }
     } catch {
-      // ignore, fallback already shown
+      /* ignore */
     }
   }
 
@@ -802,16 +882,21 @@ export default function PlannerRedesign() {
     };
   }, []);
 
-  // 👇 geolocation fix
+  // geolocation
+  function dismissHotelError() {
+    setHotelError(null);
+  }
+
   function useMyLocation() {
     if (typeof window === "undefined") {
-      setHotelError("Geolocation not available (SSR)");
+      setHotelError("Location not available in this environment.");
       return;
     }
     if (!("geolocation" in navigator)) {
-      setHotelError("Geolocation unavailable in this browser");
+      setHotelError("Your browser doesn’t support geolocation.");
       return;
     }
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
@@ -825,16 +910,22 @@ export default function PlannerRedesign() {
         setHotelError(null);
       },
       (err) => {
-        setHotelError(
-          err?.message ||
-            "Failed to get location (check site permissions / HTTPS)"
-        );
+        const msg =
+          err.code === err.PERMISSION_DENIED
+            ? "Location permission was blocked. Enable location for this site and try again."
+            : err.message || "Failed to get location.";
+        setHotel({
+          name: city,
+          area: city,
+          desc: "Fallback to city center",
+        });
+        setHotelError(msg);
       },
       { enableHighAccuracy: true, timeout: 12000 }
     );
   }
 
-  // basic runtime assertions
+  // basic sanity
   useEffect(() => {
     try {
       console.assert(
@@ -844,21 +935,23 @@ export default function PlannerRedesign() {
         "haversine zero"
       );
     } catch {
-      // ignore
+      /* ignore */
     }
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 via-indigo-50 to-white p-6">
+    <div
+      className={`min-h-screen bg-gradient-to-b ${VIBE_BG[vibe]} p-6 transition-all`}
+    >
       <div className="max-w-6xl mx-auto space-y-5">
         {/* Top bar */}
-        <div className="rounded-2xl bg-white border p-4 flex flex-wrap items-center gap-3">
-          <div className="text-lg font-semibold mr-auto">
-            Largekite - Plan Builder
-          </div>
-          <div className="flex items-center gap-2 text-xs mr-2">
+        <div className="rounded-2xl bg-white/80 backdrop-blur border p-4 flex flex-wrap items-center gap-3 shadow-sm">
+          <div className="flex items-center gap-2 mr-auto">
+            <div className="text-lg font-semibold tracking-tight">
+              Largekite — {vibe === "romantic" ? "Romantic" : vibe === "family" ? "Family" : "Adventurous"} trip plan
+            </div>
             <span
-              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border ${
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-xs ${
                 apiOk == null
                   ? "bg-slate-50 text-slate-600"
                   : apiOk
@@ -879,7 +972,7 @@ export default function PlannerRedesign() {
             <select
               value={country}
               onChange={(e) => setCountry(e.target.value)}
-              className="border rounded-lg p-1"
+              className="border rounded-lg p-1 bg-white"
             >
               <option value="USA">USA</option>
             </select>
@@ -888,7 +981,7 @@ export default function PlannerRedesign() {
               value={city}
               onChange={(e) => setCity(e.target.value)}
               placeholder="e.g., St. Louis"
-              className="border rounded-lg p-1 w-44"
+              className="border rounded-lg p-1 w-44 bg-white"
             />
           </div>
           <div className="flex gap-2">
@@ -897,7 +990,7 @@ export default function PlannerRedesign() {
                 key={v}
                 onClick={() => setVibe(v)}
                 aria-pressed={vibe === v}
-                className={`px-3 py-1.5 rounded-full border text-sm ${
+                className={`px-3 py-1.5 rounded-full border text-sm transition-all ${
                   vibe === v
                     ? "bg-indigo-600 text-white border-indigo-600"
                     : "bg-white text-slate-800"
@@ -906,9 +999,7 @@ export default function PlannerRedesign() {
                 {v === "romantic" && (
                   <Heart className="inline w-4 h-4 mr-1" />
                 )}
-                {v === "family" && (
-                  <Users className="inline w-4 h-4 mr-1" />
-                )}
+                {v === "family" && <Users className="inline w-4 h-4 mr-1" />}
                 {v === "adventurous" && (
                   <Mountain className="inline w-4 h-4 mr-1" />
                 )}
@@ -929,7 +1020,7 @@ export default function PlannerRedesign() {
                   Math.max(1, Math.min(14, parseInt(e.target.value || "1")))
                 )
               }
-              className="w-20 border rounded-lg p-1"
+              className="w-20 border rounded-lg p-1 bg-white"
             />
           </div>
           <div className="w-full sm:w-auto">
@@ -942,7 +1033,7 @@ export default function PlannerRedesign() {
         </div>
 
         {/* Hotel / Area */}
-        <div className="rounded-2xl bg-white border p-4">
+        <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm">
           <div className="font-semibold mb-2">Hotel / Area</div>
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3">
@@ -980,7 +1071,7 @@ export default function PlannerRedesign() {
                     ? hotelError
                     : "Matches"}
                 </div>
-                <div className="divide-y max-h-60 overflow-auto">
+                <div className="divide-y max-h-56 overflow-auto">
                   {hotelSugs.map((h, i) => (
                     <button
                       key={`${h.name}-${i}`}
@@ -1013,8 +1104,14 @@ export default function PlannerRedesign() {
               </div>
             )}
             {hotelError && (
-              <div className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded px-2 py-1">
-                {hotelError}
+              <div className="flex items-start gap-2 text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded px-2 py-1">
+                <span>{hotelError}</span>
+                <button
+                  onClick={dismissHotelError}
+                  className="ml-auto text-rose-500 hover:text-rose-700"
+                >
+                  ×
+                </button>
               </div>
             )}
             <div className="flex flex-wrap items-center gap-3">
@@ -1040,7 +1137,7 @@ export default function PlannerRedesign() {
         {/* Main two-column */}
         <div className="grid lg:grid-cols-2 gap-5">
           {/* Left: Day plan */}
-          <div className="bg-white rounded-2xl border p-4">
+          <div className="bg-white/90 backdrop-blur rounded-2xl border p-4 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <div className="font-semibold">Day {currentDay}</div>
               <div className="flex items-center gap-2">
@@ -1048,6 +1145,7 @@ export default function PlannerRedesign() {
                   onClick={() => rebuildDayForVibe(currentDay)}
                   className="text-xs flex items-center gap-1 px-2 py-1 rounded border bg-white hover:bg-slate-50"
                 >
+                  <RefreshCcw className="w-3.5 h-3.5" />
                   Rebuild for vibe
                 </button>
                 <button
@@ -1071,26 +1169,31 @@ export default function PlannerRedesign() {
                 label="Activity"
                 value={cur.activity}
                 onClick={() => openSlot("activity")}
+                onRefresh={() => refreshSingleSlot("activity")}
               />
               <SlotButton
                 label="Breakfast"
                 value={cur.breakfast}
                 onClick={() => openSlot("breakfast")}
+                onRefresh={() => refreshSingleSlot("breakfast")}
               />
               <SlotButton
                 label="Lunch"
                 value={cur.lunch}
                 onClick={() => openSlot("lunch")}
+                onRefresh={() => refreshSingleSlot("lunch")}
               />
               <SlotButton
                 label="Dinner"
                 value={cur.dinner}
                 onClick={() => openSlot("dinner")}
+                onRefresh={() => refreshSingleSlot("dinner")}
               />
               <SlotButton
                 label="Coffee"
                 value={cur.coffee}
                 onClick={() => openSlot("coffee")}
+                onRefresh={() => refreshSingleSlot("coffee")}
               />
             </div>
             <textarea
@@ -1105,17 +1208,18 @@ export default function PlannerRedesign() {
                   return next;
                 })
               }
-              placeholder="Notes (times, confirmations, etc.)"
-              className="mt-3 w-full border rounded-lg p-2 text-sm"
+              placeholder="Notes (times, confirmations, tickets, parking…) "
+              className="mt-3 w-full border rounded-lg p-2 text-sm bg-white"
             />
           </div>
 
           {/* Right: Map */}
-          <div className="bg-white rounded-2xl border p-4">
-            <div className="font-semibold mb-2">Map - Day {currentDay}</div>
-            <div className="text-[11px] text-slate-500 mb-2">
-              Routes show real ETAs when the backend returns directions;
-              otherwise straight-line estimates.
+          <div className="bg-white/90 backdrop-blur rounded-2xl border p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-semibold">Map - Day {currentDay}</div>
+              <div className="text-[11px] text-slate-400">
+                straight-line fallback when routes unavailable
+              </div>
             </div>
             <svg
               viewBox="0 0 100 100"
@@ -1216,7 +1320,6 @@ export default function PlannerRedesign() {
                 const hue = 220 + idx * 40;
                 return (
                   <g key={`${p.name}-${idx}`}>
-                    {/* 👇 changed to comma-style hsl */}
                     <circle
                       cx={x}
                       cy={y}
@@ -1289,10 +1392,14 @@ export default function PlannerRedesign() {
         </div>
 
         {/* Plan View */}
-        <div className="rounded-2xl bg-white border p-4">
+        <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="font-semibold">Plan View</div>
             <div className="flex items-center gap-2">
+              <button className="px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50 text-sm flex items-center gap-2">
+                <Share2 className="w-4 h-4" />
+                Share
+              </button>
               <button
                 onClick={handlePrint}
                 className="px-3 py-1.5 rounded-lg border bg-slate-50 hover:bg-slate-100 text-sm flex items-center gap-2"
@@ -1369,15 +1476,15 @@ export default function PlannerRedesign() {
           }`}
           onClose={() => setSlotModalOpen(false)}
         >
-          <div className="mb-4 rounded-xl border p-3 bg-slate-50">
+          <div className="mb-4 rounded-xl border p-3 bg-slate-50/60">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-slate-600">Area/Neighborhood</span>
                 <input
                   value={areaFilter}
                   onChange={(e) => setAreaFilter(e.target.value)}
-                  placeholder="e.g., Tower Grove, Central West End"
-                  className="border rounded-lg p-1"
+                  placeholder="e.g., Tower Grove"
+                  className="border rounded-lg p-1 bg-white"
                 />
               </div>
               {slotKey !== "hotel" && (
@@ -1433,6 +1540,20 @@ export default function PlannerRedesign() {
                   )}
                 </>
               )}
+              <div className="flex items-center gap-2 text-sm">
+                <Filter className="w-4 h-4 text-slate-500" />
+                <select
+                  value={sortMode}
+                  onChange={(e) =>
+                    setSortMode(e.target.value as typeof sortMode)
+                  }
+                  className="border rounded-lg p-1 bg-white text-xs"
+                >
+                  <option value="default">Sort: Default</option>
+                  <option value="distance">Sort: Distance</option>
+                  <option value="rating">Sort: Rating</option>
+                </select>
+              </div>
             </div>
           </div>
           <div className="text-[11px] text-slate-500 mb-2">
@@ -1463,7 +1584,7 @@ export default function PlannerRedesign() {
             <textarea
               value={detailText}
               onChange={(e) => setDetailText(e.target.value)}
-              className="w-full border rounded-lg p-2 text-sm min-h-[160px]"
+              className="w-full border rounded-lg p-2 text-sm min-h-[160px] bg-white"
             />
             <div className="flex items-center gap-2">
               <button
