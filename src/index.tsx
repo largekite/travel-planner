@@ -10,7 +10,6 @@ import {
   Car,
   Footprints,
   Printer,
-  Wand2,
   Hotel,
   Search,
   Crosshair,
@@ -22,17 +21,15 @@ import {
 } from "lucide-react";
 
 /****************************************************
- * Largekite - Trip Planner (Polished UI)
+ * Largekite - Trip Planner (Auto-notes)
+ * - removes "Rebuild for vibe" and "Suggest details"
+ * - notes now auto-generate whenever a slot is chosen
  ****************************************************/
 
-// Same-origin API base
 const API_BASE: string =
   (typeof window !== "undefined" && (window as any).__API_BASE__) ||
   (typeof window !== "undefined" ? window.location.origin : "");
 
-// ---------------------------------
-// Types & constants
-// ---------------------------------
 const VIBES = ["romantic", "family", "adventurous"] as const;
 type Vibe = (typeof VIBES)[number];
 
@@ -100,14 +97,12 @@ type ApiDirectionsSegment = {
   to: string;
 };
 
-// vibe colors
 const VIBE_BG: Record<Vibe, string> = {
   romantic: "from-rose-50/60 to-white",
   family: "from-amber-50/60 to-white",
   adventurous: "from-emerald-50/60 to-white",
 };
 
-// map projection defaults
 const STL_BOUNDS = {
   minLat: 38.45,
   maxLat: 38.8,
@@ -115,9 +110,7 @@ const STL_BOUNDS = {
   maxLng: -90.05,
 };
 
-// ---------------------------------
-// Detail text builder
-// ---------------------------------
+// ------------- detail text builder ----------
 const VIBE_MEAL_TIPS: Record<Vibe, string> = {
   romantic: "ask for patio or booth; share a starter; golden-hour timing",
   family: "kid-friendly picks; split plates; build in breaks",
@@ -163,12 +156,9 @@ function buildDetailText(d: DayPlan | undefined, vibe: Vibe): string {
   return parts.length ? parts.join("\n") : "No selections yet for this day.";
 }
 
-// ---------------------------------
-// Map helpers
-// ---------------------------------
+// ------------- map helpers ----------
 function project(lat?: number, lng?: number) {
-  if (lat == null || lng == null)
-    return { x: -999, y: -999, hidden: true };
+  if (lat == null || lng == null) return { x: -999, y: -999, hidden: true };
   const { minLat, maxLat, minLng, maxLng } = STL_BOUNDS;
   const nx = (lng - minLng) / (maxLng - minLng);
   const ny = 1 - (lat - minLat) / (maxLat - minLat);
@@ -209,9 +199,7 @@ function toSvgPath(path: [number, number][]): string {
   );
 }
 
-// ---------------------------------
-// UI components
-// ---------------------------------
+// ------------- basic UI parts ----------
 function Modal({
   open,
   title,
@@ -426,9 +414,7 @@ function DaysStrip({
   );
 }
 
-// ---------------------------------
-// Main component
-// ---------------------------------
+// ------------- main component ----------
 export default function PlannerRedesign() {
   const [country, setCountry] = useState<string>("USA");
   const [city, setCity] = useState<string>("St. Louis");
@@ -439,14 +425,12 @@ export default function PlannerRedesign() {
     () => Array.from({ length: 3 }, () => ({}))
   );
 
-  // hotel
   const [hotel, setHotel] = useState<SelectedItem | null>(null);
   const [hotelQuery, setHotelQuery] = useState<string>("");
   const [hotelSugs, setHotelSugs] = useState<ApiSuggestion[]>([]);
   const [hotelLoading, setHotelLoading] = useState<boolean>(false);
   const [hotelError, setHotelError] = useState<string | null>(null);
 
-  // suggestion modal
   const [slotModalOpen, setSlotModalOpen] = useState(false);
   const [slotKey, setSlotKey] = useState<SlotKey>("activity");
   const [areaFilter, setAreaFilter] = useState<string>("");
@@ -457,30 +441,20 @@ export default function PlannerRedesign() {
     "default"
   );
 
-  // detail modal
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [detailDay, setDetailDay] = useState<number>(1);
-  const [detailText, setDetailText] = useState<string>("");
-
-  // live suggestions
   const [liveItems, setLiveItems] = useState<ApiSuggestion[]>([]);
   const [liveLoading, setLiveLoading] = useState<boolean>(false);
   const [liveError, setLiveError] = useState<string | null>(null);
 
-  // map directions
   const [dirSegs, setDirSegs] = useState<ApiDirectionsSegment[] | null>(null);
   const [dirErr, setDirErr] = useState<string | null>(null);
 
-  // api status
   const [apiOk, setApiOk] = useState<boolean | null>(null);
   const [apiLatency, setApiLatency] = useState<number | null>(null);
   const [apiMsg, setApiMsg] = useState<string | null>(null);
 
-  // debug
   const [lastFetchUrl, setLastFetchUrl] = useState<string>("");
   const [lastResultCount, setLastResultCount] = useState<number>(0);
 
-  // resize plan when days change
   useEffect(() => {
     setPlan((prev) => {
       const copy = [...prev];
@@ -494,7 +468,12 @@ export default function PlannerRedesign() {
     setCurrentDay((d) => Math.max(1, Math.min(daysCount, d)));
   }, [daysCount]);
 
-  function setSlot(dayIndex1Based: number, key: SlotKey, value?: SelectedItem) {
+  // wrapper that auto-updates notes whenever we modify a slot (only for non-hotel)
+  function setSlotAndAutoNotes(
+    dayIndex1Based: number,
+    key: SlotKey,
+    value?: SelectedItem
+  ) {
     if (key === "hotel") {
       setHotel(value || null);
       return;
@@ -502,8 +481,12 @@ export default function PlannerRedesign() {
     setPlan((prev) => {
       const next = prev.map((d) => ({ ...d }));
       const i = Math.max(0, Math.min(prev.length - 1, dayIndex1Based - 1));
+      // update slot
       if (!value) delete (next[i] as any)[key];
       else (next[i] as any)[key] = value;
+      // auto-regenerate notes for that day
+      const auto = buildDetailText(next[i], vibe);
+      next[i].notes = auto;
       return next;
     });
   }
@@ -525,16 +508,21 @@ export default function PlannerRedesign() {
       desc: item.desc,
       meta: item.meta,
     };
-    if (slotKey === "hotel") setHotel(sel);
-    else setSlot(currentDay, slotKey, sel);
+    if (slotKey === "hotel") {
+      setHotel(sel);
+    } else {
+      setSlotAndAutoNotes(currentDay, slotKey, sel);
+    }
     setSlotModalOpen(false);
   }
 
   function clearDay(dayIndex1Based: number) {
-    (["activity", "breakfast", "lunch", "coffee", "dinner", "notes"] as (
-      | keyof DayPlan
-      | "notes"
-    )[]).forEach((k) => setSlot(dayIndex1Based, k as SlotKey, undefined));
+    setPlan((prev) => {
+      const next = prev.map((d) => ({ ...d }));
+      const i = dayIndex1Based - 1;
+      next[i] = {};
+      return next;
+    });
   }
 
   const cur = plan[currentDay - 1] || {};
@@ -610,7 +598,6 @@ export default function PlannerRedesign() {
     return () => ctrl.abort();
   }, [hotelQuery, city]);
 
-  // build params used for slot fetch
   function buildSlotParams() {
     const noun =
       slotKey === "hotel" ? "hotels or areas" : `${slotKey} places`;
@@ -668,7 +655,6 @@ export default function PlannerRedesign() {
             ratings: it.ratings || undefined,
           })
         );
-        // sort client-side if needed
         if (sortMode === "rating") {
           items = items.sort(
             (a: ApiSuggestion, b: ApiSuggestion) =>
@@ -706,59 +692,7 @@ export default function PlannerRedesign() {
     sortMode,
   ]);
 
-  // refresh single slot from main UI
-  async function refreshSingleSlot(slot: SlotKey) {
-    setSlotKey(slot);
-    setSlotModalOpen(true);
-  }
-
-  // rebuild day
-  async function rebuildDayForVibe(dayIndex1Based: number) {
-    const cats: SlotKey[] = [
-      "breakfast",
-      "activity",
-      "lunch",
-      "coffee",
-      "dinner",
-    ];
-    for (const cat of cats) {
-      const params = new URLSearchParams({
-        q: `Suggest top ${cat} in ${city} for a ${vibe} vibe`,
-        city,
-        vibe,
-        slot: String(cat),
-        limit: "1",
-        lat: hotel?.lat != null ? String(hotel.lat) : "",
-        lng: hotel?.lng != null ? String(hotel.lng) : "",
-        near: String(useNearFilter),
-        mode: nearMode,
-        maxMins: String(nearMaxMins),
-        area: areaFilter || "",
-      });
-      try {
-        const r = await fetch(`${API_BASE}/api/places?${params.toString()}`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const data: AiResponse = await r.json();
-        const first = data.items?.[0];
-        if (first)
-          setSlot(dayIndex1Based, cat, {
-            name: first.name,
-            url: first.url,
-            area: first.area,
-            cuisine: first.cuisine,
-            price: first.price,
-            lat: first.lat,
-            lng: first.lng,
-            desc: first.desc,
-            meta: first.meta,
-          });
-      } catch {
-        // ignore per-slot
-      }
-    }
-  }
-
-  // directions call (optional)
+  // directions
   useEffect(() => {
     if (chosenItems.length < 2) {
       setDirSegs(null);
@@ -801,51 +735,6 @@ export default function PlannerRedesign() {
     window.print();
   }
 
-  async function openDetail(dayIdx1: number) {
-    setDetailDay(dayIdx1);
-    const day = plan[dayIdx1 - 1];
-    const uiText = buildDetailText(day, vibe);
-    setDetailText(uiText);
-    setDetailOpen(true);
-    // optional backend enrich
-    try {
-      const r = await fetch(`${API_BASE}/api/enrich`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          city,
-          vibe,
-          selections: {
-            breakfast: day?.breakfast?.name,
-            activity: day?.activity?.name,
-            lunch: day?.lunch?.name,
-            coffee: day?.coffee?.name,
-            dinner: day?.dinner?.name,
-          },
-        }),
-      });
-      if (r.ok) {
-        const j = await r.json();
-        if (j?.desc) setDetailText(j.desc);
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-
-  function insertDetailIntoNotes() {
-    setPlan((prev) => {
-      const next = prev.map((d) => ({ ...d }));
-      const i = detailDay - 1;
-      const existing = next[i].notes?.trim();
-      next[i].notes = existing
-        ? `${existing}\n\n${detailText}`
-        : detailText;
-      return next;
-    });
-    setDetailOpen(false);
-  }
-
   // api status
   useEffect(() => {
     let cancelled = false;
@@ -877,7 +766,6 @@ export default function PlannerRedesign() {
     };
   }, []);
 
-  // geolocation
   function dismissHotelError() {
     setHotelError(null);
   }
@@ -920,7 +808,6 @@ export default function PlannerRedesign() {
     );
   }
 
-  // sanity
   useEffect(() => {
     try {
       console.assert(
@@ -1141,62 +1028,47 @@ export default function PlannerRedesign() {
           <div className="bg-white/90 backdrop-blur rounded-2xl border p-4 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <div className="font-semibold">Day {currentDay}</div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => rebuildDayForVibe(currentDay)}
-                  className="text-xs flex items-center gap-1 px-2 py-1 rounded border bg-white hover:bg-slate-50"
-                >
-                  <RefreshCcw className="w-3.5 h-3.5" />
-                  Rebuild for vibe
-                </button>
-                <button
-                  onClick={() => openDetail(currentDay)}
-                  className="text-xs flex items-center gap-1 px-2 py-1 rounded border bg-indigo-50 hover:bg-indigo-100"
-                >
-                  <Wand2 className="w-3.5 h-3.5" />
-                  Suggest details
-                </button>
-                <button
-                  onClick={() => clearDay(currentDay)}
-                  className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Clear
-                </button>
-              </div>
+              <button
+                onClick={() => clearDay(currentDay)}
+                className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Clear
+              </button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <SlotButton
                 label="Activity"
                 value={cur.activity}
                 onClick={() => openSlot("activity")}
-                onRefresh={() => refreshSingleSlot("activity")}
+                onRefresh={() => openSlot("activity")}
               />
               <SlotButton
                 label="Breakfast"
                 value={cur.breakfast}
                 onClick={() => openSlot("breakfast")}
-                onRefresh={() => refreshSingleSlot("breakfast")}
+                onRefresh={() => openSlot("breakfast")}
               />
               <SlotButton
                 label="Lunch"
                 value={cur.lunch}
                 onClick={() => openSlot("lunch")}
-                onRefresh={() => refreshSingleSlot("lunch")}
+                onRefresh={() => openSlot("lunch")}
               />
               <SlotButton
                 label="Dinner"
                 value={cur.dinner}
                 onClick={() => openSlot("dinner")}
-                onRefresh={() => refreshSingleSlot("dinner")}
+                onRefresh={() => openSlot("dinner")}
               />
               <SlotButton
                 label="Coffee"
                 value={cur.coffee}
                 onClick={() => openSlot("coffee")}
-                onRefresh={() => refreshSingleSlot("coffee")}
+                onRefresh={() => openSlot("coffee")}
               />
             </div>
+            {/* notes now auto-populate, but user can still edit */}
             <textarea
               value={cur.notes || ""}
               onChange={(e) =>
@@ -1209,7 +1081,7 @@ export default function PlannerRedesign() {
                   return next;
                 })
               }
-              placeholder="Notes (times, confirmations, tickets, parking…) "
+              placeholder="Auto-generated notes. You can edit."
               className="mt-3 w-full border rounded-lg p-2 text-sm bg-white"
             />
           </div>
@@ -1226,7 +1098,6 @@ export default function PlannerRedesign() {
               viewBox="0 0 100 100"
               className="w-full aspect-square rounded-xl border bg-slate-50"
             >
-              {/* Grid */}
               {[...Array(8)].map((_, i) => (
                 <line
                   key={`h-${i}`}
@@ -1250,7 +1121,6 @@ export default function PlannerRedesign() {
                 />
               ))}
 
-              {/* backend directions */}
               {dirSegs &&
                 dirSegs.map((seg, idx) => (
                   <g key={`rseg-${idx}`}>
@@ -1284,7 +1154,6 @@ export default function PlannerRedesign() {
                   </g>
                 ))}
 
-              {/* straight-line fallback */}
               {!dirSegs &&
                 straightSegments.map((seg, idx) => {
                   const a = project(seg.a.lat, seg.a.lng);
@@ -1314,7 +1183,6 @@ export default function PlannerRedesign() {
                   );
                 })}
 
-              {/* Pins */}
               {chosenItems.map((p, idx) => {
                 const { x, y, hidden } = project(p.lat, p.lng);
                 if (hidden) return null;
@@ -1339,7 +1207,6 @@ export default function PlannerRedesign() {
                 );
               })}
 
-              {/* Hotel pin */}
               {hotel && hotel.lat && hotel.lng && (() => {
                 const { x, y, hidden } = project(hotel.lat, hotel.lng);
                 if (hidden) return null;
@@ -1573,38 +1440,6 @@ export default function PlannerRedesign() {
             error={liveError}
             usingApi={true}
           />
-        </Modal>
-
-        {/* Detail modal */}
-        <Modal
-          open={detailOpen}
-          title={`Suggested details - Day ${detailDay}`}
-          onClose={() => setDetailOpen(false)}
-        >
-          <div className="space-y-3">
-            <textarea
-              value={detailText}
-              onChange={(e) => setDetailText(e.target.value)}
-              className="w-full border rounded-lg p-2 text-sm min-h-[160px] bg-white"
-            />
-            <div className="flex items-center gap-2">
-              <button
-                onClick={insertDetailIntoNotes}
-                className="px-3 py-1.5 rounded-lg border bg-indigo-50 hover:bg-indigo-100 text-sm"
-              >
-                Insert into Day {detailDay} notes
-              </button>
-              <button
-                onClick={() => setDetailOpen(false)}
-                className="px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50 text-sm"
-              >
-                Close
-              </button>
-            </div>
-            <div className="text-[11px] text-slate-500">
-              Fetched from backend when available, otherwise generated in UI.
-            </div>
-          </div>
         </Modal>
       </div>
     </div>
