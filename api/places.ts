@@ -1,38 +1,26 @@
 // api/places.ts
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-// helper to build google textsearch query
-function buildGoogleUrl(params: {
-  query: string;
-  lat?: string;
-  lng?: string;
-  radius?: number;
-  apiKey: string;
-}) {
-  const base = "https://maps.googleapis.com/maps/api/place/textsearch/json";
-  const u = new URL(base);
-  u.searchParams.set("query", params.query);
-  // if you pass lat/lng, you can also pass radius to prioritize
-  if (params.lat && params.lng && params.radius) {
-    u.searchParams.set("location", `${params.lat},${params.lng}`);
-    u.searchParams.set("radius", String(params.radius));
-  }
-  u.searchParams.set("key", params.apiKey);
-  return u.toString();
+// convert walk/drive minutes to meters (rough)
+function minutesToRadiusMeters(mode: string, maxMins: number): number {
+  // walk ~ 80m/min, drive ~ 700m/min (very rough, but good enough for filtering)
+  const mins = Math.max(1, Math.min(60, maxMins || 15));
+  const meters = mode === "walk" ? mins * 80 : mins * 700;
+  // clamp so Google is happy
+  return Math.max(500, Math.min(15000, meters));
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // health check used by the UI
+  // health check
   if (req.query.health) {
     return res.status(200).json({ ok: true });
   }
 
-  const googleKey = process.env.GOOGLE_PLACES_API_KEY;
+  const googleKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!googleKey) {
-    return res.status(500).json({ error: "GOOGLE_PLACES_API_KEY is not set" });
+    return res.status(500).json({ error: "GOOGLE_MAPS_API_KEY is not set" });
   }
 
-  // frontend sends these
   const city = (req.query.city as string) || "";
   const slot = (req.query.slot as string) || "activity";
   const vibe = (req.query.vibe as string) || "romantic";
@@ -44,63 +32,75 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const lng = (req.query.lng as string) || "";
   const limit = Number(req.query.limit || 10);
 
-  // map slot -> a loose google query
+  // map UI slots to something Google understands
   const slotToQuery: Record<string, string> = {
     breakfast: "breakfast",
-    lunch: "lunch restaurant",
-    dinner: "dinner restaurant",
-    coffee: "coffee shop",
+    lunch: "restaurant",
+    dinner: "restaurant",
+    coffee: "cafe",
     activity: "tourist attraction",
-    hotel: "hotel",
+    hotel: "lodging",
   };
-  const slotQuery = slotToQuery[slot] || slotToQuery["activity"];
+  const googleType = slotToQuery[slot] || "restaurant";
 
-  // build a human query like:
-  // "breakfast in St. Louis romantic near tower grove"
-  const pieces = [slotQuery];
-  if (area) pieces.push(area);
-  if (city) pieces.push(city);
-  if (vibe) pieces.push(vibe);
-  const query = pieces.join(" ");
+  // ------------------------------------------------------------------
+  // decide which Google endpoint to hit
+  // ------------------------------------------------------------------
+  const useNearby = near && lat && lng; // only nearbysearch if we have coords
+  const radius = useNearby ? minutesToRadiusMeters(mode, maxMins) : undefined;
 
-  // radius: if near-me is on, we want to bias to closer places
-  let radius = 0;
-  if (near && lat && lng) {
-    // walking ~ 80m per min, driving ~ 700m per min (very rough)
-    radius = mode === "walk" ? maxMins * 80 : maxMins * 700;
-    if (radius < 1000) radius = 1000; // google wants reasonable min
-    if (radius > 15000) radius = 15000; // keep it sane
-  }
+  let places: any[] = [];
 
-  const url = buildGoogleUrl({
-    query,
-    lat: near ? lat : undefined,
-    lng: near ? lng : undefined,
-    radius: radius || undefined,
-    apiKey: googleKey,
-  });
-
-  let googleJson: any;
   try {
-    const r = await fetch(url);
-    googleJson = await r.json();
+    if (useNearby) {
+      // 1) NEARBY SEARCH – this is the one that respects radius
+      const nearbyUrl = new URL(
+        "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+      );
+      nearbyUrl.searchParams.set("location", `${lat},${lng}`);
+      nearbyUrl.searchParams.set("radius", String(radius));
+      // restaurant/cafe/lodging/tourist_attraction etc.
+      nearbyUrl.searchParams.set("type", googleType);
+      // bias toward city/area by making the query richer
+      const nameBits = [slot, area || city, vibe].filter(Boolean).join(" ");
+      nearbyUrl.searchParams.set("keyword", nameBits);
+      nearbyUrl.searchParams.set("key", googleKey);
+
+      const r = await fetch(nearbyUrl.toString());
+      const data = await r.json();
+      places = Array.isArray(data.results) ? data.results : [];
+    } else {
+      // 2) TEXT SEARCH – when we don't have coords
+      const textUrl = new URL(
+        "https://maps.googleapis.com/maps/api/place/textsearch/json"
+      );
+      const qParts = [googleType, area || city, vibe].filter(Boolean).join(" ");
+      textUrl.searchParams.set("query", qParts);
+      textUrl.searchParams.set("key", googleKey);
+
+      const r = await fetch(textUrl.toString());
+      const data = await r.json();
+      places = Array.isArray(data.results) ? data.results : [];
+    }
   } catch (e: any) {
-    return res.status(500).json({ error: "google fetch failed", detail: e?.message });
+    return res
+      .status(500)
+      .json({ error: "google fetch failed", detail: e?.message });
   }
 
-  const places: any[] = Array.isArray(googleJson.results)
-    ? googleJson.results.slice(0, limit)
-    : [];
+  // trim
+  places = places.slice(0, limit);
 
-  // we will try to enrich with OpenAI (optional)
+  // ------------------------------------------------------------------
+  // OPTIONAL: enrich with OpenAI
+  // ------------------------------------------------------------------
   const openaiKey = process.env.OPENAI_API_KEY;
   let aiDescriptions: Record<string, string> = {};
 
   if (openaiKey && places.length > 0) {
     try {
-      // we only send the names to avoid large prompts
       const names = places.map((p) => p.name).join(", ");
-      const prompt = `You are helping a travel planner. For these places in ${city}, give a SHORT 1-sentence description tailored to a "${vibe}" vibe. Return as JSON object keyed by exact place name.\nPlaces: ${names}`;
+      const prompt = `You are helping a travel planner. For these places in ${city}, give a SHORT 1-sentence description tailored to a "${vibe}" vibe. Return JSON object keyed by exact place name.\nPlaces: ${names}`;
       const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -114,24 +114,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }),
       }).then((r) => r.json());
 
-      const text =
-        aiRes.choices?.[0]?.message?.content?.trim() || "{}";
-
-      // try to parse as JSON, if not, ignore
+      const text = aiRes?.choices?.[0]?.message?.content?.trim() || "{}";
       try {
         const parsed = JSON.parse(text);
         if (parsed && typeof parsed === "object") {
           aiDescriptions = parsed;
         }
       } catch {
-        // ignore AI parse error
+        // ignore JSON parse errors
       }
-    } catch (e) {
-      // ignore AI errors, we can still return raw places
+    } catch {
+      // ignore AI errors
     }
   }
 
-  // normalize to what the React UI expects
+  // ------------------------------------------------------------------
+  // normalize to UI shape
+  // ------------------------------------------------------------------
   const items = places.map((p) => {
     const loc = p.geometry?.location;
     const name = p.name as string;
@@ -145,8 +144,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       lat: loc?.lat,
       lng: loc?.lng,
       desc: desc,
-      meta: near && lat && lng
-        ? `within ~${maxMins} min ${mode}`
+      // show what we actually filtered on
+      meta: useNearby
+        ? `within ~${maxMins} min ${mode} (${radius}m)`
         : undefined,
       ratings: {
         google: p.rating,
