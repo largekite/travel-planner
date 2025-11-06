@@ -1,68 +1,15 @@
+// src/components/SuggestionModal.tsx
 import React from "react";
-import { X, Footprints, Car, Filter } from "lucide-react";
-import { ApiSuggestion, SlotKey, SelectedItem } from "../lib/types";
-
-function SuggestionCard({
-  item,
-  index,
-  onChoose,
-}: {
-  item: ApiSuggestion;
-  index: number;
-  onChoose: (item: ApiSuggestion) => void;
-}) {
-  return (
-    <div className="rounded-xl border bg-white/80 hover:bg-indigo-50/30 transition-all p-3 flex justify-between gap-3">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <div className="text-xs text-slate-400 w-5 shrink-0">{index}.</div>
-          {item.url ? (
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noreferrer"
-              className="font-medium text-slate-900 hover:text-indigo-700 truncate"
-            >
-              {item.name}
-            </a>
-          ) : (
-            <div className="font-medium text-slate-900 truncate">
-              {item.name}
-            </div>
-          )}
-        </div>
-        <div className="text-[11px] text-slate-500 mt-1">
-          {[item.cuisine, item.price, item.area].filter(Boolean).join(" · ")}
-        </div>
-        {item.desc && (
-          <div className="text-[11px] text-slate-600 mt-1 line-clamp-2">
-            {item.desc}
-          </div>
-        )}
-        {item.meta && (
-          <div className="text-[10px] text-indigo-700 mt-1 bg-indigo-50 inline-block rounded-full px-2 py-0.5">
-            {item.meta}
-          </div>
-        )}
-      </div>
-      <div>
-        <button
-          onClick={() => onChoose(item)}
-          className="px-3 py-1.5 rounded-lg border bg-indigo-50 hover:bg-indigo-100 text-xs"
-        >
-          Use
-        </button>
-      </div>
-    </div>
-  );
-}
+import { X, Footprints, Car } from "lucide-react";
+import { ApiSuggestion } from "../lib/api";
+import { SelectedItem } from "../lib/types";
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  slotKey: SlotKey;
+  slotKey: string;
   areaFilter: string;
-  setAreaFilter: (v: string) => void;
+  setAreaFilter: (s: string) => void;
   useNearFilter: boolean;
   setUseNearFilter: (b: boolean) => void;
   nearMode: "walk" | "drive";
@@ -73,11 +20,11 @@ type Props = {
   items: ApiSuggestion[];
   loading: boolean;
   error: string | null;
-  onChoose: (it: ApiSuggestion) => void;
+  onChoose: (i: ApiSuggestion) => void;
   sortMode: "default" | "distance" | "rating";
-  setSortMode: (v: "default" | "distance" | "rating") => void;
-  lastFetchUrl: string;
-  lastResultCount: number;
+  setSortMode: (m: "default" | "distance" | "rating") => void;
+  lastFetchUrl?: string;
+  lastResultCount?: number;
 };
 
 export default function SuggestionModal({
@@ -106,129 +53,190 @@ export default function SuggestionModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-[min(920px,96vw)] max-h-[86vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-slate-50/60 backdrop-blur">
-          <div className="font-semibold">
-            Choose{" "}
-            {slotKey === "hotel"
-              ? "Hotel / Area"
-              : slotKey.charAt(0).toUpperCase() + slotKey.slice(1)}
-          </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100">
+      <div className="relative bg-white rounded-2xl shadow-xl w-[min(900px,96vw)] max-h-[86vh] overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-slate-50">
+          <div className="font-semibold">Choose {slotKey}</div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-slate-100"
+            type="button"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="overflow-y-auto p-4 grow">
-          <div className="mb-4 rounded-xl border p-3 bg-slate-50/60">
+        <div className="overflow-auto p-4 space-y-4">
+          {/* filters */}
+          <div className="rounded-xl border p-3 bg-slate-50 space-y-3">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-slate-600">Area/Neighborhood</span>
+                <span className="text-slate-600">Area / neighborhood</span>
                 <input
                   value={areaFilter}
                   onChange={(e) => setAreaFilter(e.target.value)}
-                  placeholder="e.g., Tower Grove"
-                  className="border rounded-lg p-1 bg-white"
+                  placeholder="e.g., Tower Grove, Central West End"
+                  className="border rounded-lg p-1 text-sm"
                 />
               </div>
-              {slotKey !== "hotel" && (
-                <>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={useNearFilter}
-                      onChange={(e) => setUseNearFilter(e.target.checked)}
-                    />
-                    <span>Filter by near me</span>
-                  </label>
-                  <div className="flex items-center gap-2 text-sm">
-                    <button
-                      onClick={() => setNearMode("walk")}
-                      className={`px-2 py-1 rounded border text-xs ${
-                        nearMode === "walk"
-                          ? "bg-emerald-600 text-white border-emerald-600"
-                          : "bg-white"
-                      }`}
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={useNearFilter}
+                  onChange={(e) => setUseNearFilter(e.target.checked)}
+                />
+                Filter by near me
+              </label>
+              <div className="flex items-center gap-2 text-sm">
+                <button
+                  onClick={() => setNearMode("walk")}
+                  className={`px-2 py-1 rounded border text-xs ${
+                    nearMode === "walk"
+                      ? "bg-emerald-600 text-white"
+                      : "bg-white"
+                  }`}
+                  type="button"
+                >
+                  <Footprints className="inline w-3.5 h-3.5 mr-1" />
+                  Walk
+                </button>
+                <button
+                  onClick={() => setNearMode("drive")}
+                  className={`px-2 py-1 rounded border text-xs ${
+                    nearMode === "drive"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-white"
+                  }`}
+                  type="button"
+                >
+                  <Car className="inline w-3.5 h-3.5 mr-1" />
+                  Drive
+                </button>
+              </div>
+              <div className="text-xs text-slate-600">
+                Max minutes: {nearMaxMins}
+              </div>
+              <input
+                type="range"
+                min={5}
+                max={30}
+                value={nearMaxMins}
+                onChange={(e) => setNearMaxMins(parseInt(e.target.value))}
+              />
+              {!hotel && useNearFilter && (
+                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
+                  Pick a hotel/center or use current location to enable near-me.
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span>Sort:</span>
+              <button
+                onClick={() => setSortMode("default")}
+                className={
+                  sortMode === "default"
+                    ? "px-2 py-1 bg-slate-800 text-white rounded"
+                    : "px-2 py-1 rounded border"
+                }
+                type="button"
+              >
+                default
+              </button>
+              <button
+                onClick={() => setSortMode("rating")}
+                className={
+                  sortMode === "rating"
+                    ? "px-2 py-1 bg-slate-800 text-white rounded"
+                    : "px-2 py-1 rounded border"
+                }
+                type="button"
+              >
+                rating
+              </button>
+              <button
+                onClick={() => setSortMode("distance")}
+                className={
+                  sortMode === "distance"
+                    ? "px-2 py-1 bg-slate-800 text-white rounded"
+                    : "px-2 py-1 rounded border"
+                }
+                type="button"
+              >
+                distance
+              </button>
+            </div>
+            {lastFetchUrl && (
+              <div className="text-[10px] text-slate-400 break-all">
+                last request: {lastFetchUrl}
+              </div>
+            )}
+            {typeof lastResultCount === "number" && (
+              <div className="text-[10px] text-slate-400">
+                {lastResultCount} result(s)
+              </div>
+            )}
+          </div>
+
+          {/* results */}
+          {error && <div className="text-amber-700 text-sm">{error}</div>}
+          {loading && (
+            <div className="text-sm text-slate-500">Loading suggestions…</div>
+          )}
+          {!loading && items.length === 0 && !error && (
+            <div className="text-sm text-slate-500">
+              No matches. Try removing area or near-me filter.
+            </div>
+          )}
+          <div className="divide-y">
+            {items.map((it, idx) => (
+              <div
+                key={idx}
+                className="py-3 flex items-start justify-between gap-3"
+              >
+                <div>
+                  {it.url ? (
+                    <a
+                      href={it.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-blue-700 hover:underline"
                     >
-                      <Footprints className="inline w-3.5 h-3.5 mr-1" />
-                      Walk
-                    </button>
-                    <button
-                      onClick={() => setNearMode("drive")}
-                      className={`px-2 py-1 rounded border text-xs ${
-                        nearMode === "drive"
-                          ? "bg-indigo-600 text-white border-indigo-600"
-                          : "bg-white"
-                      }`}
-                    >
-                      <Car className="inline w-3.5 h-3.5 mr-1" />
-                      Drive
-                    </button>
-                  </div>
-                  <div className="text-xs text-slate-600">
-                    Max minutes: {nearMaxMins}
-                  </div>
-                  <input
-                    type="range"
-                    min={5}
-                    max={30}
-                    value={nearMaxMins}
-                    onChange={(e) =>
-                      setNearMaxMins(parseInt(e.target.value || "15"))
-                    }
-                  />
-                  {!hotel && useNearFilter && (
-                    <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
-                      Pick a hotel/center to enable near-me filtering.
+                      {idx + 1}. {it.name}
+                    </a>
+                  ) : (
+                    <div className="font-medium">
+                      {idx + 1}. {it.name}
                     </div>
                   )}
-                </>
-              )}
-              <div className="flex items-center gap-2 text-sm">
-                <Filter className="w-4 h-4 text-slate-500" />
-                <select
-                  value={sortMode}
-                  onChange={(e) =>
-                    setSortMode(e.target.value as typeof sortMode)
-                  }
-                  className="border rounded-lg p-1 bg-white text-xs"
-                >
-                  <option value="default">Sort: Default</option>
-                  <option value="distance">Sort: Distance</option>
-                  <option value="rating">Sort: Rating</option>
-                </select>
+                  <div className="text-xs text-slate-500">
+                    {[it.cuisine, it.price, it.area].filter(Boolean).join(" · ")}
+                  </div>
+                  {it.desc && (
+                    <div className="text-xs text-slate-600 mt-0.5">
+                      {it.desc}
+                    </div>
+                  )}
+                  {it.meta && (
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      {it.meta}
+                    </div>
+                  )}
+                  {it.ratings?.google && (
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      Google {it.ratings.google.toFixed(1)} ·{" "}
+                      {(it.ratings.googleReviews || 0).toLocaleString()} reviews
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <button
+                    onClick={() => onChoose(it)}
+                    className="px-3 py-1.5 rounded-lg border bg-indigo-50 hover:bg-indigo-100 text-sm"
+                    type="button"
+                  >
+                    Use
+                  </button>
+                </div>
               </div>
-            </div>
-          </div>
-
-          <div className="text-[11px] text-slate-500 mb-2">
-            <div>
-              Last request URL:{" "}
-              <span className="break-all">
-                {lastFetchUrl || "(none yet)"}
-              </span>
-            </div>
-            <div>Items returned: {lastResultCount}</div>
-          </div>
-
-          <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-            {items.map((it, idx) => (
-              <SuggestionCard
-                key={`${it.name}-${idx}`}
-                item={it}
-                index={idx + 1}
-                onChoose={onChoose}
-              />
             ))}
-            {!loading && items.length === 0 && (
-              <div className="py-8 text-center text-sm text-slate-400">
-                {error ? error : "No matches."}
-              </div>
-            )}
-            {loading && (
-              <div className="py-4 text-center text-sm text-slate-400">
-                Loading…
-              </div>
-            )}
           </div>
         </div>
       </div>
