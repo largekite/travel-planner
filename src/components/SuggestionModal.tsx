@@ -1,4 +1,3 @@
-// src/components/SuggestionModal.tsx
 import React from "react";
 import { X, Footprints, Car } from "lucide-react";
 import { ApiSuggestion } from "../lib/api";
@@ -50,12 +49,17 @@ export default function SuggestionModal({
   lastResultCount,
 }: Props) {
   if (!open) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Overlay */}
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-[min(900px,96vw)] max-h-[86vh] overflow-hidden">
+
+      {/* Modal */}
+      <div className="relative bg-white rounded-2xl shadow-xl w-[min(900px,96vw)] max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-slate-50">
-          <div className="font-semibold">Choose {slotKey}</div>
+          <div className="font-semibold capitalize">Choose {slotKey}</div>
           <button
             onClick={onClose}
             className="p-1 rounded hover:bg-slate-100"
@@ -64,19 +68,24 @@ export default function SuggestionModal({
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="overflow-auto p-4 space-y-4">
-          {/* filters */}
+
+        {/* Body */}
+        <div className="p-4 flex-1 flex flex-col gap-4 overflow-hidden">
+          {/* Filters */}
           <div className="rounded-xl border p-3 bg-slate-50 space-y-3">
             <div className="flex flex-wrap items-center gap-3">
+              {/* Area input */}
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-slate-600">Area / neighborhood</span>
                 <input
                   value={areaFilter}
                   onChange={(e) => setAreaFilter(e.target.value)}
-                  placeholder="e.g., Tower Grove, Central West End"
+                  placeholder="e.g., Tower Grove, Wildwood"
                   className="border rounded-lg p-1 text-sm"
                 />
               </div>
+
+              {/* Near-me filter */}
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -85,12 +94,14 @@ export default function SuggestionModal({
                 />
                 Filter by near me
               </label>
+
+              {/* Mode buttons */}
               <div className="flex items-center gap-2 text-sm">
                 <button
                   onClick={() => setNearMode("walk")}
                   className={`px-2 py-1 rounded border text-xs ${
                     nearMode === "walk"
-                      ? "bg-emerald-600 text-white"
+                      ? "bg-emerald-600 text-white border-emerald-600"
                       : "bg-white"
                   }`}
                   type="button"
@@ -102,7 +113,7 @@ export default function SuggestionModal({
                   onClick={() => setNearMode("drive")}
                   className={`px-2 py-1 rounded border text-xs ${
                     nearMode === "drive"
-                      ? "bg-indigo-600 text-white"
+                      ? "bg-indigo-600 text-white border-indigo-600"
                       : "bg-white"
                   }`}
                   type="button"
@@ -111,6 +122,8 @@ export default function SuggestionModal({
                   Drive
                 </button>
               </div>
+
+              {/* Max minutes slider */}
               <div className="text-xs text-slate-600">
                 Max minutes: {nearMaxMins}
               </div>
@@ -121,48 +134,36 @@ export default function SuggestionModal({
                 value={nearMaxMins}
                 onChange={(e) => setNearMaxMins(parseInt(e.target.value))}
               />
+
+              {/* Warning */}
               {!hotel && useNearFilter && (
                 <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
-                  Pick a hotel/center or use current location to enable near-me.
+                  Pick a hotel/center or use your current location to enable
+                  near-me filter.
                 </div>
               )}
             </div>
+
+            {/* Sort buttons */}
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <span>Sort:</span>
-              <button
-                onClick={() => setSortMode("default")}
-                className={
-                  sortMode === "default"
-                    ? "px-2 py-1 bg-slate-800 text-white rounded"
-                    : "px-2 py-1 rounded border"
-                }
-                type="button"
-              >
-                default
-              </button>
-              <button
-                onClick={() => setSortMode("rating")}
-                className={
-                  sortMode === "rating"
-                    ? "px-2 py-1 bg-slate-800 text-white rounded"
-                    : "px-2 py-1 rounded border"
-                }
-                type="button"
-              >
-                rating
-              </button>
-              <button
-                onClick={() => setSortMode("distance")}
-                className={
-                  sortMode === "distance"
-                    ? "px-2 py-1 bg-slate-800 text-white rounded"
-                    : "px-2 py-1 rounded border"
-                }
-                type="button"
-              >
-                distance
-              </button>
+              {(["default", "rating", "distance"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setSortMode(mode)}
+                  className={`px-2 py-1 rounded border ${
+                    sortMode === mode
+                      ? "bg-slate-800 text-white"
+                      : "bg-white text-slate-700"
+                  }`}
+                  type="button"
+                >
+                  {mode}
+                </button>
+              ))}
             </div>
+
+            {/* Debug info (optional) */}
             {lastFetchUrl && (
               <div className="text-[10px] text-slate-400 break-all">
                 last request: {lastFetchUrl}
@@ -175,21 +176,26 @@ export default function SuggestionModal({
             )}
           </div>
 
-          {/* results */}
-          {error && <div className="text-amber-700 text-sm">{error}</div>}
-          {loading && (
-            <div className="text-sm text-slate-500">Loading suggestions…</div>
-          )}
-          {!loading && items.length === 0 && !error && (
-            <div className="text-sm text-slate-500">
-              No matches. Try removing area or near-me filter.
-            </div>
-          )}
-          <div className="divide-y">
+          {/* Results list (scrollable) */}
+          <div className="flex-1 overflow-y-auto border rounded-lg divide-y bg-white/60">
+            {error && (
+              <div className="text-amber-700 text-sm p-3">{error}</div>
+            )}
+            {loading && (
+              <div className="text-sm text-slate-500 p-3">
+                Loading suggestions…
+              </div>
+            )}
+            {!loading && items.length === 0 && !error && (
+              <div className="text-sm text-slate-500 p-3">
+                No matches. Try removing area or near-me filter.
+              </div>
+            )}
+
             {items.map((it, idx) => (
               <div
                 key={idx}
-                className="py-3 flex items-start justify-between gap-3"
+                className="py-3 px-3 flex items-start justify-between gap-3 hover:bg-slate-50"
               >
                 <div>
                   {it.url ? (
@@ -206,9 +212,13 @@ export default function SuggestionModal({
                       {idx + 1}. {it.name}
                     </div>
                   )}
+
                   <div className="text-xs text-slate-500">
-                    {[it.cuisine, it.price, it.area].filter(Boolean).join(" · ")}
+                    {[it.cuisine, it.price, it.area]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </div>
+
                   {it.desc && (
                     <div className="text-xs text-slate-600 mt-0.5">
                       {it.desc}
@@ -226,15 +236,14 @@ export default function SuggestionModal({
                     </div>
                   )}
                 </div>
-                <div>
-                  <button
-                    onClick={() => onChoose(it)}
-                    className="px-3 py-1.5 rounded-lg border bg-indigo-50 hover:bg-indigo-100 text-sm"
-                    type="button"
-                  >
-                    Use
-                  </button>
-                </div>
+
+                <button
+                  onClick={() => onChoose(it)}
+                  className="px-3 py-1.5 rounded-lg border bg-indigo-50 hover:bg-indigo-100 text-sm whitespace-nowrap"
+                  type="button"
+                >
+                  Use
+                </button>
               </div>
             ))}
           </div>
