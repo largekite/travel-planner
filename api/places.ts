@@ -27,9 +27,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ ok: true });
   }
 
-  const googleKey = process.env.GOOGLE_MAPS_API_KEY;
+  const googleKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!googleKey) {
-    return res.status(500).json({ error: "GOOGLE_MAPS_API_KEY is not set" });
+    return res.status(500).json({ error: "GOOGLE_PLACES_API_KEY is not set" });
   }
 
   // frontend sends these
