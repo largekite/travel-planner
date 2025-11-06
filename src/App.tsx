@@ -218,74 +218,64 @@ export default function App() {
   }
 
   // fetch suggestions whenever modal is open or filters change
-  useEffect(() => {
-    if (!slotModalOpen) return;
-    if (!API_BASE) {
-      setLiveItems([]);
-      setLiveError("API base not configured");
-      return;
-    }
-    const ctrl = new AbortController();
-    setLiveLoading(true);
+// inside App.tsx
+useEffect(() => {
+  if (!slotModalOpen) return;
+  if (!API_BASE) {
+    setLiveItems([]);
+    setLiveError("API base not configured");
+    return;
+  }
 
-    const params = new URLSearchParams({
-      city,
-      vibe,
-      slot: slotKey,
-      limit: "10",
-      near: String(useNearFilter),
-      mode: nearMode,
-      maxMins: String(nearMaxMins),
-      lat: hotel?.lat ? String(hotel.lat) : "",
-      lng: hotel?.lng ? String(hotel.lng) : "",
-      area: areaFilter || "",
-      q: `Suggest top ${slotKey} places in ${city} for a ${vibe} vibe`,
-    });
+  const ctrl = new AbortController();
+  setLiveLoading(true);
 
-    const url = `${API_BASE}/api/places?${params.toString()}`;
-    setLastFetchUrl(url);
-
-    fetchPlaces(API_BASE, params, ctrl.signal)
-      .then((items) => {
-        let sorted = items;
-        if (sortMode === "rating") {
-          sorted = [...items].sort(
-            (a, b) => (b.ratings?.google || 0) - (a.ratings?.google || 0)
-          );
-        } else if (sortMode === "distance") {
-          sorted = [...items].sort((a, b) => {
-            const am = a.meta?.match(/(\d+)\s*min/)?.[1];
-            const bm = b.meta?.match(/(\d+)\s*min/)?.[1];
-            if (am && bm) return Number(am) - Number(bm);
-            return 0;
-          });
-        }
-        setLiveItems(sorted);
-        setLastResultCount(sorted.length);
-        setLiveError(null);
-      })
-      .catch((err) => {
-        if ((err as any).name !== "AbortError") {
-          setLiveError(String(err?.message || err));
-        }
-      })
-      .finally(() => setLiveLoading(false));
-
-    return () => ctrl.abort();
-  }, [
-    slotModalOpen,
+  const params = new URLSearchParams({
     city,
     vibe,
-    slotKey,
-    useNearFilter,
-    nearMode,
-    nearMaxMins,
-    hotel?.lat,
-    hotel?.lng,
-    areaFilter,
-    sortMode,
-    API_BASE,
-  ]);
+    slot: slotKey,
+    limit: "10",
+    near: String(useNearFilter),
+    mode: nearMode,
+    maxMins: String(nearMaxMins),
+    lat: hotel?.lat ? String(hotel.lat) : "",
+    lng: hotel?.lng ? String(hotel.lng) : "",
+    area: areaFilter || "",
+    q: `Suggest top ${slotKey} places in ${city} for a ${vibe} vibe${
+      areaFilter ? " around " + areaFilter : ""
+    }`,
+  });
+
+  fetchPlaces(API_BASE, params, ctrl.signal)
+    .then(({ items, raw }) => {
+      setLiveItems(items);
+      setLiveError(null);
+      setLastFetchUrl(`${API_BASE}/api/places?${params.toString()}`);
+      setLastResultCount(items.length);
+    })
+    .catch((err) => {
+      if ((err as any).name !== "AbortError") {
+        setLiveError(String(err?.message || err));
+      }
+      setLiveItems([]);
+    })
+    .finally(() => setLiveLoading(false));
+
+  return () => ctrl.abort();
+}, [
+  slotModalOpen,
+  city,
+  vibe,
+  slotKey,
+  useNearFilter,
+  nearMode,
+  nearMaxMins,
+  hotel?.lat,
+  hotel?.lng,
+  areaFilter,
+  API_BASE,
+]);
+
 
   function clearDay(dayIndex1Based: number) {
     setPlan((prev) => {
