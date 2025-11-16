@@ -32,6 +32,7 @@ function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: num
   const c = 2 * Math.atan2(Math.sqrt(sa), Math.sqrt(1 - sa));
   return R * c;
 }
+
 function etaMins(mode: "walk" | "drive", km: number) {
   const speedKmh = mode === "walk" ? 5 : 35;
   return Math.round((km / speedKmh) * 60);
@@ -56,38 +57,67 @@ export default function MapPanel({
   const [mapReady, setMapReady] = useState(false);
   const [usedGoogle, setUsedGoogle] = useState(false);
 
-  // try to load google maps if key provided
+  // Try to load Google Maps JS if a key is provided.
   useEffect(() => {
-    const key =
-      (typeof window !== "undefined" &&
-        (window as any).__GOOGLE_MAPS_KEY) ||
-      (typeof import.meta !== "undefined" &&
-        (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY);
-    if (!key) return; // no key, fallback to SVG
+    if (typeof window === "undefined") return;
 
-    if (typeof window !== "undefined" && !(window as any).google) {
-      const s = document.createElement("script");
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${key}`;
-      s.async = true;
-      s.onload = () => setMapReady(true);
-      document.head.appendChild(s);
-    } else {
-      setMapReady(true);
+    // 1) optional global override (for experimentation)
+    // 2) main source: Vite env var VITE_GOOGLE_MAPS_API_KEY
+    const key =
+      (window as any).__GOOGLE_MAPS_KEY ||
+      (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY;
+
+    if (!key) {
+      console.warn(
+        "MapPanel: no VITE_GOOGLE_MAPS_API_KEY (or window.__GOOGLE_MAPS_KEY) found – using SVG fallback."
+      );
+      return;
     }
+
+    // If Google Maps JS is already loaded, just mark as ready.
+    if ((window as any).google && (window as any).google.maps) {
+      setMapReady(true);
+      return;
+    }
+
+    // Inject the script tag once.
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[data-largekite-maps="1"]'
+    );
+    if (existing) {
+      existing.addEventListener("load", () => setMapReady(true), { once: true });
+      return;
+    }
+
+    const s = document.createElement("script");
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}`;
+    s.async = true;
+    s.defer = true;
+    s.dataset.largekiteMaps = "1";
+    s.onload = () => setMapReady(true);
+    s.onerror = () => {
+      console.error("MapPanel: failed to load Google Maps JS – falling back to SVG.");
+    };
+    document.head.appendChild(s);
   }, []);
 
-  // init map if ready
+  // Initialize the map when the script is ready and we have a container.
   useEffect(() => {
     if (!mapReady) return;
     if (!mapRef.current) return;
-    const g = (window as any).google;
-    if (!g || !g.maps) return;
 
-    const center = hotel?.lat
+    const g = (window as any).google;
+    if (!g || !g.maps) {
+      console.error("MapPanel: google.maps not available after script load.");
+      return;
+    }
+
+    const center = hotel?.lat && hotel.lng
       ? { lat: hotel.lat, lng: hotel.lng }
-      : chosenItems[0]?.lat
+      : chosenItems[0]?.lat && chosenItems[0]?.lng
       ? { lat: chosenItems[0].lat!, lng: chosenItems[0].lng! }
-      : { lat: 38.627, lng: -90.199 }; // St. Louis center
+      : { lat: 38.627, lng: -90.199 }; // St. Louis center fallback
+
     const map = new g.maps.Map(mapRef.current, {
       zoom: 12,
       center,
@@ -96,7 +126,7 @@ export default function MapPanel({
       fullscreenControl: false,
     });
 
-    // add markers
+    // Add markers for chosen places.
     chosenItems.forEach((p) => {
       if (!p.lat || !p.lng) return;
       new g.maps.Marker({
@@ -105,7 +135,9 @@ export default function MapPanel({
         title: p.name,
       });
     });
-    if (hotel?.lat && hotel?.lng) {
+
+    // Special marker for hotel / center.
+    if (hotel?.lat && hotel.lng) {
       new g.maps.Marker({
         position: { lat: hotel.lat, lng: hotel.lng },
         map,
@@ -119,10 +151,16 @@ export default function MapPanel({
         },
       });
     }
-    setUsedGoogle(true);
-  }, [mapReady, hotel?.lat, hotel?.lng, JSON.stringify(chosenItems.map((c) => c.name))]);
 
-  // fallback straight segments
+    setUsedGoogle(true);
+  }, [
+    mapReady,
+    hotel?.lat,
+    hotel?.lng,
+    JSON.stringify(chosenItems.map((c) => c.name)),
+  ]);
+
+  // Fallback straight segments when no real directions are available.
   const straightSegments = React.useMemo(() => {
     const segs: {
       a: SelectedItem;
@@ -139,7 +177,7 @@ export default function MapPanel({
         { lat: A.lat, lng: A.lng },
         { lat: B.lat, lng: B.lng }
       );
-      const mode = km > 1.2 ? "drive" : "walk";
+      const mode: "walk" | "drive" = km > 1.2 ? "drive" : "walk";
       const mins = etaMins(mode, km);
       segs.push({ a: A, b: B, km, mode, mins });
     }
@@ -151,11 +189,10 @@ export default function MapPanel({
       <div className="flex items-center justify-between mb-2">
         <div className="font-semibold">Map - Day {currentDay}</div>
         <div className="text-[11px] text-slate-400">
-          {usedGoogle
-            ? "Google Maps"
-            : "SVG fallback (no Google key set)"}
+          {usedGoogle ? "Google Maps" : "SVG fallback (no Google key set)"}
         </div>
       </div>
+
       {usedGoogle ? (
         <div ref={mapRef} className="w-full h-[320px] rounded-xl border" />
       ) : (
@@ -163,6 +200,7 @@ export default function MapPanel({
           viewBox="0 0 100 100"
           className="w-full aspect-square rounded-xl border bg-slate-50"
         >
+          {/* grid */}
           {[...Array(8)].map((_, i) => (
             <line
               key={`h-${i}`}
@@ -186,6 +224,7 @@ export default function MapPanel({
             />
           ))}
 
+          {/* directions segments (if any) */}
           {dirSegs &&
             dirSegs.map((seg, idx) => {
               const pts = seg.path.map(([lat, lng]) => project(lat, lng));
@@ -210,6 +249,7 @@ export default function MapPanel({
               );
             })}
 
+          {/* fallback straight segments */}
           {!dirSegs &&
             straightSegments.map((seg, idx) => {
               const a = project(seg.a.lat, seg.a.lng);
@@ -229,6 +269,7 @@ export default function MapPanel({
               );
             })}
 
+          {/* pins */}
           {chosenItems.map((p, idx) => {
             const { x, y, hidden } = project(p.lat, p.lng);
             if (hidden) return null;
@@ -243,6 +284,7 @@ export default function MapPanel({
             );
           })}
 
+          {/* hotel pin */}
           {hotel && hotel.lat && hotel.lng && (() => {
             const { x, y, hidden } = project(hotel.lat, hotel.lng);
             if (hidden) return null;
@@ -265,7 +307,8 @@ export default function MapPanel({
           <ul className="list-disc pl-5">
             {chosenItems.map((p, i) => (
               <li key={i}>
-                {p.name} {p.area ? <span className="text-slate-500">· {p.area}</span> : null}
+                {p.name}{" "}
+                {p.area ? <span className="text-slate-500">· {p.area}</span> : null}
               </li>
             ))}
           </ul>
