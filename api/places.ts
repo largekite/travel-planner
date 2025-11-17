@@ -3,7 +3,9 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 function minutesToRadiusMeters(mode: string, maxMins: number): number {
   const mins = Math.max(1, Math.min(60, maxMins || 15));
+  // Rough heuristics: walk ~80m/min, drive ~700m/min
   const meters = mode === "walk" ? mins * 80 : mins * 700;
+  // Clamp to something sane for urban STL
   return Math.max(500, Math.min(15000, meters));
 }
 
@@ -17,18 +19,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: "GOOGLE_PLACES_API_KEY is not set" });
   }
 
-  const city = (req.query.city as string) || "";
-  const slot = (req.query.slot as string) || "activity";
-  const vibe = (req.query.vibe as string) || "romantic";
-  const area = (req.query.area as string) || "";
+  const city = ((req.query.city as string) || "").trim();
+  const slot = ((req.query.slot as string) || "activity").trim();
+  const vibe = ((req.query.vibe as string) || "romantic").trim();
+  const area = ((req.query.area as string) || "").trim();
   const near = (req.query.near as string) === "true";
-  const mode = (req.query.mode as string) || "walk";
+  const mode = ((req.query.mode as string) || "walk").toLowerCase();
   const maxMins = Number(req.query.maxMins || 15);
   const lat = (req.query.lat as string) || "";
   const lng = (req.query.lng as string) || "";
   const limit = Number(req.query.limit || 10);
 
-  // slot → google type
   const slotToQuery: Record<string, string> = {
     breakfast: "breakfast",
     lunch: "restaurant",
@@ -39,21 +40,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
   const googleType = slotToQuery[slot] || "restaurant";
 
-  // build a location hint to keep Google inside STL
-  // if your app will *always* be STL, you can force "Missouri" here
-  const locationHint =
-    city.toLowerCase().includes("st. louis") || city.toLowerCase().includes("st louis")
-      ? "St. Louis, Missouri"
-      : city;
+  // Strong STL/Missouri hint if the city looks like St. Louis or if user types suburbs
+  const cityLower = city.toLowerCase();
+  const looksLikeStl =
+    cityLower.includes("st. louis") ||
+    cityLower.includes("st louis") ||
+    cityLower.includes("saint louis");
+
+  // If city is STL (or empty but area looks like a STL suburb), force Missouri
+  const locationHint = looksLikeStl || !city
+    ? "St. Louis, Missouri"
+    : city;
 
   const useNearby = near && lat && lng;
   const radius = useNearby ? minutesToRadiusMeters(mode, maxMins) : undefined;
 
   let places: any[] = [];
+  let rawError: any = null;
 
   try {
     if (useNearby) {
-      // nearbysearch honors location+radius, so we also add the area to keyword
+      // Nearby search with radius around center
       const nearbyUrl = new URL(
         "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
       );
@@ -61,11 +68,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       nearbyUrl.searchParams.set("radius", String(radius));
       nearbyUrl.searchParams.set("type", googleType);
 
-      // IMPORTANT: pin area to STL so "wildwood" won’t go to NJ
+      // Keep results in STL/MO; include area text plus a strong city/state hint
       const keywordParts = [
         slot,
         area,
-        locationHint, // ← keeps it in STL/MO
+        locationHint, // very important for Wildwood/Webster/Tower Grove
         vibe,
       ].filter(Boolean);
       nearbyUrl.searchParams.set("keyword", keywordParts.join(" "));
@@ -73,16 +80,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const r = await fetch(nearbyUrl.toString());
       const data = await r.json();
+      if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+        rawError = data;
+      }
       places = Array.isArray(data.results) ? data.results : [];
     } else {
-      // textsearch: we must add the city/state here too
+      // Text search without lat/lng; rely on query text + city/state
       const textUrl = new URL(
         "https://maps.googleapis.com/maps/api/place/textsearch/json"
       );
       const queryParts = [
         googleType,
         area,
-        locationHint, // ← pushes it to STL/MO
+        locationHint, // pushes to STL/MO instead of NJ/etc
         vibe,
       ].filter(Boolean);
       textUrl.searchParams.set("query", queryParts.join(" "));
@@ -90,17 +100,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const r = await fetch(textUrl.toString());
       const data = await r.json();
+      if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+        rawError = data;
+      }
       places = Array.isArray(data.results) ? data.results : [];
     }
   } catch (e: any) {
-    return res
-      .status(500)
-      .json({ error: "google fetch failed", detail: e?.message });
+    return res.status(500).json({
+      error: "google fetch failed",
+      detail: e?.message,
+    });
   }
 
   places = places.slice(0, limit);
 
-  // optional OpenAI enrichment (same as before)
+  // Optional OpenAI enrichment for vibe-tailored 1-liner descriptions
   const openaiKey = process.env.OPENAI_API_KEY;
   let aiDescriptions: Record<string, string> = {};
   if (openaiKey && places.length > 0) {
@@ -126,10 +140,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           aiDescriptions = parsed;
         }
       } catch {
-        // ignore
+        // ignore JSON parse errors
       }
     } catch {
-      // ignore ai errors
+      // ignore AI errors completely
     }
   }
 
@@ -137,11 +151,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const loc = p.geometry?.location;
     const name = p.name as string;
     const desc = aiDescriptions[name];
+
+    // Always provide a Google Maps link via place_id
+    const mapsUrl = p.place_id
+      ? `https://www.google.com/maps/place/?q=place_id:${p.place_id}`
+      : undefined;
+
+    // Simple slot → cuisine label for UI
+    let cuisine: string | undefined;
+    if (slot === "breakfast") cuisine = "Breakfast";
+    else if (slot === "lunch") cuisine = "Lunch";
+    else if (slot === "dinner") cuisine = "Dinner";
+    else if (slot === "coffee") cuisine = "Coffee";
+
     return {
       name,
-      url: p.website || p.url,
+      url: mapsUrl,                       // <-- so your UI always has a link
       area: p.vicinity || p.formatted_address,
-      cuisine: slot === "coffee" ? "Coffee" : undefined,
+      cuisine,
       price: p.price_level != null ? "$".repeat(p.price_level) : undefined,
       lat: loc?.lat,
       lng: loc?.lng,
@@ -154,5 +181,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
   });
 
-  return res.status(200).json({ items });
+  return res.status(200).json({
+    items,
+    debug: {
+      rawStatus: rawError?.status || "OK",
+      radiusMeters: radius ?? null,
+      useNearby,
+      locationHint,
+      slot,
+      city,
+      area,
+      mode,
+      maxMins,
+    },
+  });
 }
