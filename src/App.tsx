@@ -281,7 +281,7 @@ useEffect(() => {
     }`,
   });
 
-  fetchAllPlaces(API_BASE, params, 3, ctrl.signal)
+  fetchAllPlaces(API_BASE, params, 2, ctrl.signal)
     .then(({ items, raw }) => {
       setLiveItems(items);
       setLiveError(null);
@@ -349,18 +349,20 @@ useEffect(() => {
     setLoadingProgress(0);
     const slots = ['breakfast', 'activity', 'lunch', 'coffee', 'dinner'];
     
-    for (let i = 0; i < slots.length; i++) {
-      const slot = slots[i];
-      setLoadingProgress((i / slots.length) * 100);
-      
-      try {
+    try {
+      // Make all requests concurrently for better performance
+      const promises = slots.map(slot => {
         const params = new URLSearchParams({
           city, vibe, slot, limit: "1"
         });
-        const { items } = await fetchAllPlaces(API_BASE, params, 2);
-        
+        return fetchPlaces(API_BASE, params).then(result => ({ slot, items: result.items }));
+      });
+      
+      const results = await Promise.all(promises);
+      
+      const newPlan = [...plan];
+      results.forEach(({ slot, items }) => {
         if (items[0]) {
-          const newPlan = [...plan];
           (newPlan[currentDay - 1] as any)[slot] = {
             name: items[0].name,
             url: items[0].url,
@@ -369,16 +371,15 @@ useEffect(() => {
             lng: items[0].lng,
             desc: items[0].desc
           };
-          setPlan(newPlan);
         }
-        
-        await new Promise(resolve => setTimeout(resolve, 200));
-      } catch (error) {
-        console.error(`Failed to fetch ${slot}:`, error);
-      }
+      });
+      
+      setPlan(newPlan);
+      setLoadingProgress(100);
+    } catch (error) {
+      console.error('Auto-fill failed:', error);
     }
     
-    setLoadingProgress(100);
     setTimeout(() => setLoadingProgress(0), 1000);
   };
   

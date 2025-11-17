@@ -1,4 +1,6 @@
 // src/lib/api.ts
+import { getCached, setCache } from './cache';
+
 export type ApiSuggestion = {
   name: string;
   url?: string;
@@ -60,7 +62,7 @@ export async function fetchAllPlaces(
     page++;
     
     // Small delay to respect API rate limits
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 50));
   }
   
   return { items: allItems, raw: {} };
@@ -73,6 +75,13 @@ export async function fetchPlaces(
 ): Promise<{ items: ApiSuggestion[]; raw: any; hasMore?: boolean; nextPageToken?: string }> {
   const base = apiBase.replace(/\/$/, "");
   const url = `${base}/api/places?${params.toString()}`;
+  
+  // Check cache first
+  const cacheKey = url;
+  const cached = getCached(cacheKey);
+  if (cached) {
+    return cached;
+  }
 
   const res = await fetch(url, { signal });
   if (!res.ok) {
@@ -117,12 +126,17 @@ export async function fetchPlaces(
       : undefined,
   }));
 
-  return { 
+  const result = { 
     items, 
     raw: data, 
     hasMore: data.hasMore,
     nextPageToken: data.nextPageToken
   };
+  
+  // Cache the result
+  setCache(cacheKey, result);
+  
+  return result;
 }
 
 export async function fetchDayNotes(

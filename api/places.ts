@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const maxMins = Number(req.query.maxMins || 15);
   const lat = (req.query.lat as string) || "";
   const lng = (req.query.lng as string) || "";
-  const limit = Number(req.query.limit || 10);
+  const limit = Math.min(Number(req.query.limit || 10), 20); // Cap at 20 for performance
   const page = Number(req.query.page || 1);
   const offset = (page - 1) * limit;
 
