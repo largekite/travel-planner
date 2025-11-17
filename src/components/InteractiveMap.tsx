@@ -18,15 +18,17 @@ export type MapPlace = {
 
 type Props = {
   hotel: MapPlace | null;
-  places: MapPlace[];                 // ordered sequence for Day: [breakfast, activity, lunch, coffee, dinner]
-  height?: string;                    // e.g., "420px"
-  mode: "WALKING" | "DRIVING";        // from your “walk/drive” toggle
-  showRoute?: boolean;                // toggle to compute directions
+  // ordered sequence for the day: [breakfast, activity, lunch, coffee, dinner]
+  places: MapPlace[];
+  height?: string;                 // e.g., "420px"
+  mode: "WALKING" | "DRIVING";     // from your walk/drive toggle
+  showRoute?: boolean;             // toggle whether to compute/show directions
 };
 
 const STL_FALLBACK_CENTER = { lat: 38.627, lng: -90.1994 }; // St. Louis downtown-ish
-const containerStyle: google.maps.MapOptions = {
-  // These are map options; container style is set via wrapper <div>.
+
+// Map options (container size is controlled via the wrapping <div>).
+const containerOptions = {
   disableDefaultUI: false,
   clickableIcons: true,
 };
@@ -38,11 +40,13 @@ export default function InteractiveMap({
   mode,
   showRoute = true,
 }: Props) {
-  const apiKey = import.meta.env.GOOGLE_PLACES_API_KEY as string | undefined;
+  // IMPORTANT: use the Vite-exposed key name you set in Vercel:
+  // VITE_GOOGLE_MAPS_API_KEY
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: apiKey || "",
-    libraries: ["places"], // keep it lean; add "geometry" if needed
+    libraries: ["places"], // add "geometry" if you ever need it
   });
 
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -51,57 +55,81 @@ export default function InteractiveMap({
     useState<google.maps.DirectionsResult | null>(null);
   const [directionsError, setDirectionsError] = useState<string | null>(null);
 
+  // Prefer hotel as center, then first valid place, then fallback STL center.
   const center = useMemo(() => {
-    // Prefer hotel center if available; otherwise first place; otherwise fallback
     if (hotel?.lat && hotel?.lng) return { lat: hotel.lat, lng: hotel.lng };
     const first = places.find((p) => p.lat && p.lng);
     if (first) return { lat: first.lat!, lng: first.lng! };
     return STL_FALLBACK_CENTER;
-  }, [hotel?.lat, hotel?.lng, places.map(p=>p.name).join("|")]);
+  }, [hotel?.lat, hotel?.lng, places.map((p) => p.name).join("|")]);
 
+  // Only keep places that have coordinates.
   const orderedStops = useMemo(
     () => places.filter((p) => p.lat != null && p.lng != null),
     [places]
   );
 
-  const travelMode: google.maps.TravelMode =
-    mode === "WALKING" ? google.maps.TravelMode.WALKING : google.maps.TravelMode.DRIVING;
-
+  // When data or mode changes, we *allow* DirectionsService to recompute.
   useEffect(() => {
-    // Recompute directions whenever stops or mode change
     if (!isLoaded) return;
-    if (!showRoute) { setDirections(null); setDirectionsError(null); return; }
-    if (orderedStops.length < 2) { setDirections(null); setDirectionsError(null); return; }
-    // DirectionsService is rendered below; result handled in onDirectionsCallback
+    if (!showRoute) {
+      setDirections(null);
+      setDirectionsError(null);
+      return;
+    }
+    if (orderedStops.length < 2) {
+      setDirections(null);
+      setDirectionsError(null);
+      return;
+    }
+    // Actual directions are requested by the <DirectionsService> JSX below.
   }, [isLoaded, orderedStops.length, mode, showRoute]);
 
-  // Fit bounds once map is ready or data changes
+  // Fit map bounds around hotel + all stops once map & script are ready.
   useEffect(() => {
     if (!mapRef.current || !isLoaded) return;
-    const b = new google.maps.LatLngBounds();
+
+    const bounds = new google.maps.LatLngBounds();
     let added = false;
 
     if (hotel?.lat && hotel?.lng) {
-      b.extend(new google.maps.LatLng(hotel.lat, hotel.lng));
+      bounds.extend(new google.maps.LatLng(hotel.lat, hotel.lng));
       added = true;
     }
+
     orderedStops.forEach((p) => {
       if (p.lat && p.lng) {
-        b.extend(new google.maps.LatLng(p.lat, p.lng));
+        bounds.extend(new google.maps.LatLng(p.lat, p.lng));
         added = true;
       }
     });
-    if (added) mapRef.current.fitBounds(b, 48);
-  }, [isLoaded, hotel?.lat, hotel?.lng, orderedStops.map(p=>p.name).join("|")]);
+
+    if (added) {
+      mapRef.current.fitBounds(bounds, 48);
+    }
+  }, [isLoaded, hotel?.lat, hotel?.lng, orderedStops.map((p) => p.name).join("|")]);
+
+  if (!apiKey) {
+    return (
+      <div className="text-xs text-amber-700">
+        Map API key missing. Set <code>VITE_GOOGLE_MAPS_API_KEY</code> in your env.
+      </div>
+    );
+  }
 
   if (loadError) {
-    return <div className="text-sm text-rose-700">Map failed to load: {String(loadError)}</div>;
+    return (
+      <div className="text-sm text-rose-700">
+        Map failed to load: {String(loadError)}
+      </div>
+    );
   }
+
   if (!isLoaded) {
     return <div className="text-sm text-slate-600">Loading map…</div>;
   }
 
-  // Build DirectionsRequest inputs when we have 2+ stops
+  // Build DirectionsService pieces only when we have enough stops
   const origin = orderedStops[0];
   const destination = orderedStops[orderedStops.length - 1];
   const waypoints =
@@ -112,6 +140,9 @@ export default function InteractiveMap({
         }))
       : [];
 
+  // Use the string value at runtime; cast to TravelMode for TS.
+  const travelMode = mode as google.maps.TravelMode;
+
   const markerHue = (idx: number) => 230 + idx * 40; // colorful pins
 
   return (
@@ -121,13 +152,18 @@ export default function InteractiveMap({
         center={center}
         zoom={12}
         mapContainerStyle={{ height: "100%", width: "100%" }}
-        options={containerStyle}
+        options={containerOptions as google.maps.MapOptions}
       >
-        {/* Hotel / Center */}
+        {/* Hotel / Center marker */}
         {hotel?.lat && hotel?.lng && (
           <Marker
             position={{ lat: hotel.lat, lng: hotel.lng }}
-            label={{ text: "H", color: "#000", fontSize: "12px", fontWeight: "700" }}
+            label={{
+              text: "H",
+              color: "#000",
+              fontSize: "12px",
+              fontWeight: "700",
+            }}
             icon={{
               path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
               scale: 6,
@@ -140,7 +176,7 @@ export default function InteractiveMap({
           />
         )}
 
-        {/* Day stops */}
+        {/* Day stops markers */}
         {orderedStops.map((p, idx) => (
           <Marker
             key={`${p.name}-${idx}`}
@@ -164,7 +200,7 @@ export default function InteractiveMap({
           />
         ))}
 
-        {/* InfoWindow for active place */}
+        {/* Popup for the active place */}
         {activeIdx != null && orderedStops[activeIdx] && (
           <InfoWindow
             position={{
@@ -176,7 +212,9 @@ export default function InteractiveMap({
             <div className="text-sm">
               <div className="font-medium">{orderedStops[activeIdx]!.name}</div>
               {orderedStops[activeIdx]!.area && (
-                <div className="text-xs text-slate-600">{orderedStops[activeIdx]!.area}</div>
+                <div className="text-xs text-slate-600">
+                  {orderedStops[activeIdx]!.area}
+                </div>
               )}
               {orderedStops[activeIdx]!.url && (
                 <a
@@ -185,7 +223,7 @@ export default function InteractiveMap({
                   rel="noreferrer"
                   className="text-xs text-blue-700 underline"
                 >
-                  Open link
+                  Open in Google Maps
                 </a>
               )}
             </div>
@@ -201,7 +239,7 @@ export default function InteractiveMap({
                 destination: { lat: destination.lat!, lng: destination.lng! },
                 travelMode,
                 waypoints,
-                optimizeWaypoints: false, // keep user’s sequence
+                optimizeWaypoints: false, // keep user’s selected order
               }}
               callback={(res) => {
                 if (!res) return;
@@ -219,7 +257,7 @@ export default function InteractiveMap({
         )}
       </GoogleMap>
 
-      {/* error footer if directions fail */}
+      {/* Directions error footer (if any) */}
       {directionsError && (
         <div className="text-xs text-amber-700 bg-amber-50 px-3 py-1 border-t">
           Directions error: {directionsError}. Try switching walk/drive or changing stops.
