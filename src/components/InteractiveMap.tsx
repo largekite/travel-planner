@@ -54,6 +54,7 @@ export default function InteractiveMap({
   const [directions, setDirections] =
     useState<google.maps.DirectionsResult | null>(null);
   const [directionsError, setDirectionsError] = useState<string | null>(null);
+  const [directionsKey, setDirectionsKey] = useState<string>("");
 
   // Prefer hotel as center, then first valid place, then fallback STL center.
   const center = useMemo(() => {
@@ -69,21 +70,33 @@ export default function InteractiveMap({
     [places]
   );
 
+  // Generate a unique key for directions to prevent unnecessary re-renders
+  const currentDirectionsKey = useMemo(() => {
+    if (!showRoute || orderedStops.length < 2) return "";
+    const stops = orderedStops.map(p => `${p.lat},${p.lng}`).join("|");
+    return `${mode}-${stops}`;
+  }, [showRoute, orderedStops, mode]);
+
   // When data or mode changes, we *allow* DirectionsService to recompute.
   useEffect(() => {
     if (!isLoaded) return;
     if (!showRoute) {
       setDirections(null);
       setDirectionsError(null);
+      setDirectionsKey("");
       return;
     }
     if (orderedStops.length < 2) {
       setDirections(null);
       setDirectionsError(null);
+      setDirectionsKey("");
       return;
     }
-    // Actual directions are requested by the <DirectionsService> JSX below.
-  }, [isLoaded, orderedStops.length, mode, showRoute]);
+    // Only update if the key actually changed
+    if (currentDirectionsKey !== directionsKey) {
+      setDirectionsKey(currentDirectionsKey);
+    }
+  }, [isLoaded, currentDirectionsKey, directionsKey, showRoute, orderedStops.length]);
 
   // Fit map bounds around hotel + all stops once map & script are ready.
   useEffect(() => {
@@ -231,9 +244,10 @@ export default function InteractiveMap({
         )}
 
         {/* Directions calculation + rendering */}
-        {showRoute && orderedStops.length >= 2 && (
+        {showRoute && orderedStops.length >= 2 && directionsKey && (
           <>
             <DirectionsService
+              key={directionsKey}
               options={{
                 origin: { lat: origin.lat!, lng: origin.lng! },
                 destination: { lat: destination.lat!, lng: destination.lng! },

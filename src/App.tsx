@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Printer, Share2 } from "lucide-react";
+import { Printer, Share2, WifiOff } from "lucide-react";
+import { useSwipeable } from 'react-swipeable';
 import TopBar from "./components/TopBar";
 import HotelSection from "./components/HotelSection";
 import DayPlanner from "./components/DayPlanner";
@@ -15,12 +16,22 @@ import {
 } from "./lib/types";
 import {
   fetchPlaces,
+  fetchAllPlaces,
   fetchDayNotes,
   fetchDirections,
   detectApiBase,
 } from "./lib/api";
 import { optimizeRoute } from "./lib/routeOptimizer";
 import LocationButton from "./components/LocationButton";
+import ErrorBoundary from "./components/ErrorBoundary";
+import QuickActionsToolbar from "./components/QuickActionsToolbar";
+import SmartDefaults from "./components/SmartDefaults";
+import DragDropDayPlanner from "./components/DragDropDayPlanner";
+import ProgressIndicator from "./components/ProgressIndicator";
+import Tooltip from "./components/Tooltip";
+import { useHistory } from "./hooks/useHistory";
+import { useKeyboard } from "./hooks/useKeyboard";
+import { useOnline } from "./hooks/useOnline";
 
 // slots in the order they show up on the map
 const SLOT_SEQUENCE: (keyof DayPlan)[] = [
@@ -46,15 +57,29 @@ function cloneDay(d: DayPlan | undefined): DayPlan {
 export default function App() {
   const API_BASE = detectApiBase();
 
-  // global trip state
+  // global trip state with history
   const [country, setCountry] = useState("USA");
-  const [city, setCity] = useState("St. Louis");
+  const [city, setCity] = useState(() => 
+    localStorage.getItem('travel-city') || "St. Louis"
+  );
   const [vibe, setVibe] = useState<Vibe>("romantic");
   const [daysCount, setDaysCount] = useState(3);
   const [currentDay, setCurrentDay] = useState(1);
-  const [plan, setPlan] = useState<DayPlan[]>(
-    () => Array.from({ length: 3 }, () => ({}))
+  
+  const planHistory = useHistory<DayPlan[]>(
+    Array.from({ length: 3 }, () => ({}))
   );
+  const plan = planHistory.currentState;
+  const setPlan = planHistory.pushState;
+  
+  // UI state
+  const [showSmartDefaults, setShowSmartDefaults] = useState(!city || city === "St. Louis");
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
+  const [showHelp, setShowHelp] = useState(false);
+  
+  // Online status
+  const isOnline = useOnline();
 
   // hotel / center
   const [hotel, setHotel] = useState<SelectedItem | null>(null);
@@ -88,21 +113,30 @@ export default function App() {
   const [apiOk, setApiOk] = useState<boolean | null>(null);
   const [apiLatency, setApiLatency] = useState<number | null>(null);
   const [apiMsg, setApiMsg] = useState<string | null>(null);
+  
+  // Swipe gestures for mobile
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: () => setCurrentDay(Math.min(daysCount, currentDay + 1)),
+    onSwipedRight: () => setCurrentDay(Math.max(1, currentDay - 1)),
+    trackMouse: true
+  });
 
   // keep days array in sync
   useEffect(() => {
-    setPlan((prev) => {
-      const copy = [...prev];
-      if (daysCount > copy.length) {
-        return copy.concat(
-          Array.from({ length: daysCount - copy.length }, () => ({}))
-        );
-      }
-      if (daysCount < copy.length) {
-        return copy.slice(0, daysCount);
-      }
-      return copy;
-    });
+    const copy = [...plan];
+    let newPlan: DayPlan[];
+    if (daysCount > copy.length) {
+      newPlan = copy.concat(
+        Array.from({ length: daysCount - copy.length }, () => ({} as DayPlan))
+      );
+    } else if (daysCount < copy.length) {
+      newPlan = copy.slice(0, daysCount);
+    } else {
+      newPlan = copy;
+    }
+    if (newPlan !== plan) {
+      setPlan(newPlan);
+    }
     setCurrentDay((d) => Math.max(1, Math.min(daysCount, d)));
   }, [daysCount]);
 
@@ -170,6 +204,8 @@ export default function App() {
   function openSlot(slot: SlotKey) {
     setSlotKey(slot);
     setSlotModalOpen(true);
+    // Clear any existing items to force fresh fetch
+    setLiveItems([]);
   }
 
   // choose suggestion -> set slot + fetch notes
@@ -194,12 +230,10 @@ export default function App() {
     }
 
     // 1) set the slot
-    setPlan((prev) => {
-      const next = prev.map((d) => ({ ...d }));
-      const idx = currentDay - 1;
-      (next[idx] as any)[slotKey] = sel;
-      return next;
-    });
+    const next = plan.map((d: DayPlan) => ({ ...d }));
+    const idx = currentDay - 1;
+    (next[idx] as any)[slotKey] = sel;
+    setPlan(next);
 
     // 2) ask backend to generate notes for this day (non-hardcoded)
     if (API_BASE) {
@@ -208,11 +242,9 @@ export default function App() {
       fetchDayNotes(API_BASE, dayIdx, city, vibe, snapshot)
         .then((notes) => {
           if (!notes) return;
-          setPlan((prev) => {
-            const next = prev.map((d) => ({ ...d }));
-            next[dayIdx - 1].notes = notes;
-            return next;
-          });
+          const next = plan.map((d: DayPlan) => ({ ...d }));
+          next[dayIdx - 1].notes = notes;
+          setPlan(next);
         })
         .catch(() => {
           // ignore notes error, UI still works
@@ -251,7 +283,7 @@ useEffect(() => {
     }`,
   });
 
-  fetchPlaces(API_BASE, params, ctrl.signal)
+  fetchAllPlaces(API_BASE, params, 2, ctrl.signal)
     .then(({ items, raw }) => {
       setLiveItems(items);
       setLiveError(null);
@@ -283,20 +315,112 @@ useEffect(() => {
 
 
   function clearDay(dayIndex1Based: number) {
-    setPlan((prev) => {
-      const next = prev.map((d) => ({ ...d }));
-      next[dayIndex1Based - 1] = {};
-      return next;
-    });
+    const next = plan.map((d: DayPlan) => ({ ...d }));
+    next[dayIndex1Based - 1] = {} as DayPlan;
+    setPlan(next);
   }
 
-  function handlePrint() {
-    window.print();
-  }
+  // Enhanced actions
+  const handleSave = () => {
+    const planData = { plan, city, vibe, daysCount, hotel };
+    localStorage.setItem('saved-plan', JSON.stringify(planData));
+    localStorage.setItem('travel-city', city);
+  };
+  
+  const handleShare = async () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('city', city);
+    url.searchParams.set('vibe', vibe);
+    
+    if (navigator.share) {
+      await navigator.share({
+        title: `${vibe} trip to ${city}`,
+        url: url.toString()
+      });
+    } else {
+      navigator.clipboard.writeText(url.toString());
+      alert('Link copied to clipboard!');
+    }
+  };
+  
+  const handlePrint = () => window.print();
+  
+  const handleAutoFill = async () => {
+    if (!API_BASE) return;
+    
+    setLoadingProgress(0);
+    const slots = ['breakfast', 'activity', 'lunch', 'coffee', 'dinner'];
+    
+    try {
+      // Make all requests concurrently for better performance
+      const promises = slots.map(slot => {
+        const params = new URLSearchParams({
+          city, vibe, slot, limit: "1"
+        });
+        return fetchAllPlaces(API_BASE, params, 1).then(result => ({ slot, items: result.items }));
+      });
+      
+      const results = await Promise.all(promises);
+      
+      const newPlan = [...plan];
+      results.forEach(({ slot, items }) => {
+        if (items[0]) {
+          (newPlan[currentDay - 1] as any)[slot] = {
+            name: items[0].name,
+            url: items[0].url,
+            area: items[0].area,
+            lat: items[0].lat,
+            lng: items[0].lng,
+            desc: items[0].desc
+          };
+        }
+      });
+      
+      setPlan(newPlan);
+      setLoadingProgress(100);
+    } catch (error) {
+      console.error('Auto-fill failed:', error);
+    }
+    
+    setTimeout(() => setLoadingProgress(0), 1000);
+  };
+  
+  // Keyboard shortcuts
+  useKeyboard({
+    z: planHistory.undo,
+    y: planHistory.redo,
+    s: handleSave,
+    p: handlePrint
+  });
+  
+  // Auto-save
+  useEffect(() => {
+    const timer = setTimeout(handleSave, 2000);
+    return () => clearTimeout(timer);
+  }, [plan, city, vibe, hotel]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 via-indigo-50 to-white p-6">
-      <div className="max-w-6xl mx-auto space-y-5">
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gradient-to-b from-sky-50 via-indigo-50 to-white p-6" {...swipeHandlers}>
+        {/* Offline indicator */}
+        {!isOnline && (
+          <div className="fixed top-4 right-4 bg-amber-100 border border-amber-300 rounded-lg p-3 flex items-center gap-2 z-50">
+            <WifiOff className="w-4 h-4 text-amber-600" />
+            <span className="text-sm text-amber-800">You're offline</span>
+          </div>
+        )}
+        
+        {/* Loading progress */}
+        {loadingProgress > 0 && (
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg p-3 z-50">
+            <ProgressIndicator 
+              message="Auto-filling your day..." 
+              progress={loadingProgress} 
+            />
+          </div>
+        )}
+        
+        <div className="max-w-6xl mx-auto space-y-5">
         <TopBar
           apiOk={apiOk}
           apiLatency={apiLatency}
@@ -304,7 +428,10 @@ useEffect(() => {
           country={country}
           setCountry={setCountry}
           city={city}
-          setCity={setCity}
+          setCity={(newCity) => {
+            setCity(newCity);
+            setShowSmartDefaults(false);
+          }}
           vibe={vibe}
           setVibe={setVibe}
           daysCount={daysCount}
@@ -312,6 +439,29 @@ useEffect(() => {
           currentDay={currentDay}
           setCurrentDay={setCurrentDay}
         />
+        
+        {/* Smart Defaults */}
+        {showSmartDefaults && (
+          <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold">Quick Start</h2>
+              <button 
+                onClick={() => setShowSmartDefaults(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                ×
+              </button>
+            </div>
+            <SmartDefaults
+              onCitySelect={(newCity) => {
+                setCity(newCity);
+                setShowSmartDefaults(false);
+              }}
+              onVibeSelect={setVibe}
+              onQuickFill={handleAutoFill}
+            />
+          </div>
+        )}
 
         <HotelSection
           city={city}
@@ -389,11 +539,9 @@ useEffect(() => {
                         }
                       });
                       
-                      setPlan(prev => {
-                        const next = [...prev];
-                        next[currentDay - 1] = dayData;
-                        return next;
-                      });
+                      const next = [...plan];
+                      next[currentDay - 1] = dayData;
+                      setPlan(next);
                       
                       setShowOptimization(false);
                     }}
@@ -409,68 +557,46 @@ useEffect(() => {
 
         <div className="grid lg:grid-cols-2 gap-5">
           <div className="space-y-4">
-            <DayPlanner
+            <DragDropDayPlanner
               currentDay={currentDay}
               plan={plan}
-              openSlot={openSlot}
-              clearDay={clearDay}
               setPlan={setPlan}
+              openSlot={(slot: string) => openSlot(slot as SlotKey)}
             />
             
-            {/* Quick Location Actions */}
+            {/* Quick Actions */}
             <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm">
               <div className="font-semibold mb-3">Quick Actions</div>
               <div className="flex gap-2 flex-wrap">
-                <LocationButton
-                  onLocationFound={(lat, lng) => {
-                    setHotel({
-                      name: "Current Location",
-                      lat,
-                      lng,
-                      area: "Your location"
-                    });
-                  }}
-                  className="text-sm"
-                />
-                <button
-                  onClick={() => {
-                    // Auto-fill day with popular places
-                    if (API_BASE) {
-                      const slots = ['breakfast', 'activity', 'lunch', 'coffee', 'dinner'];
-                      slots.forEach((slot, i) => {
-                        setTimeout(() => {
-                          const params = new URLSearchParams({
-                            city,
-                            vibe,
-                            slot,
-                            limit: "1"
-                          });
-                          fetchPlaces(API_BASE, params)
-                            .then(({ items }) => {
-                              if (items[0]) {
-                                setPlan(prev => {
-                                  const next = [...prev];
-                                  (next[currentDay - 1] as any)[slot] = {
-                                    name: items[0].name,
-                                    url: items[0].url,
-                                    area: items[0].area,
-                                    lat: items[0].lat,
-                                    lng: items[0].lng,
-                                    desc: items[0].desc
-                                  };
-                                  return next;
-                                });
-                              }
-                            })
-                            .catch(() => {});
-                        }, i * 200);
+                <Tooltip content="Use your current location as hotel">
+                  <LocationButton
+                    onLocationFound={(lat, lng) => {
+                      setHotel({
+                        name: "Current Location",
+                        lat,
+                        lng,
+                        area: "Your location"
                       });
-                    }
-                  }}
-                  className="px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50 text-sm"
-                >
-                  Auto-fill Day
-                </button>
+                    }}
+                    className="text-sm"
+                  />
+                </Tooltip>
+                
+                <Tooltip content="Automatically fill day with popular places">
+                  <button
+                    onClick={handleAutoFill}
+                    disabled={loadingProgress > 0}
+                    className="px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50 text-sm disabled:opacity-50"
+                  >
+                    {loadingProgress > 0 ? 'Filling...' : 'Auto-fill Day'}
+                  </button>
+                </Tooltip>
+              </div>
+              
+              {/* Help hints */}
+              <div className="mt-3 text-xs text-slate-500 space-y-1">
+                <div>💡 Tip: Swipe left/right to change days on mobile</div>
+                <div>⌨️ Shortcuts: Ctrl+Z (undo), Ctrl+S (save), Ctrl+P (print)</div>
               </div>
             </div>
           </div>
@@ -489,7 +615,10 @@ useEffect(() => {
           <div className="flex items-center justify-between">
             <div className="font-semibold">Plan View</div>
             <div className="flex items-center gap-2">
-              <button className="px-3 py-1.5 rounded-lg border bg-white text-sm flex items-center gap-2">
+              <button 
+                onClick={handleShare}
+                className="px-3 py-1.5 rounded-lg border bg-white text-sm flex items-center gap-2"
+              >
                 <Share2 className="w-4 h-4" />
                 Share
               </button>
@@ -566,7 +695,43 @@ useEffect(() => {
           lastFetchUrl={lastFetchUrl}
           lastResultCount={lastResultCount}
         />
+        
+        {/* Quick Actions Toolbar */}
+        <QuickActionsToolbar
+          canUndo={planHistory.canUndo}
+          canRedo={planHistory.canRedo}
+          onUndo={planHistory.undo}
+          onRedo={planHistory.redo}
+          onSave={handleSave}
+          onShare={handleShare}
+          onPrint={handlePrint}
+          onHelp={() => setShowHelp(true)}
+        />
+        
+        {/* Help Modal */}
+        {showHelp && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-2xl p-6 max-w-md mx-4">
+              <h3 className="font-semibold mb-4">How to use Travel Planner</h3>
+              <div className="space-y-2 text-sm text-slate-600">
+                <p>• Click on time slots to add places</p>
+                <p>• Drag items to reorder your day</p>
+                <p>• Use filters to find specific types of places</p>
+                <p>• Compare places before choosing</p>
+                <p>• Auto-optimize your route for efficiency</p>
+              </div>
+              <button
+                onClick={() => setShowHelp(false)}
+                className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 w-full"
+              >
+                Got it!
+              </button>
+            </div>
+          </div>
+        )}
+        
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }

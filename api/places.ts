@@ -10,6 +10,15 @@ function minutesToRadiusMeters(mode: string, maxMins: number): number {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Add CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.query.health) {
     return res.status(200).json({ ok: true });
   }
@@ -28,7 +37,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const maxMins = Number(req.query.maxMins || 15);
   const lat = (req.query.lat as string) || "";
   const lng = (req.query.lng as string) || "";
-  const limit = Number(req.query.limit || 10);
+  const limit = Math.min(Number(req.query.limit || 10), 20); // Cap at 20 for performance
+  const page = Number(req.query.page || 1);
+  const offset = (page - 1) * limit;
 
   const slotToQuery: Record<string, string> = {
     breakfast: "breakfast",
@@ -56,6 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const radius = useNearby ? minutesToRadiusMeters(mode, maxMins) : undefined;
 
   let places: any[] = [];
+  let nextPageToken: string | null = null;
   let rawError: any = null;
 
   try {
@@ -78,12 +90,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       nearbyUrl.searchParams.set("keyword", keywordParts.join(" "));
       nearbyUrl.searchParams.set("key", googleKey);
 
+      // Handle pagination for nearby search
+      if (page > 1 && req.query.pageToken) {
+        nearbyUrl.searchParams.set("pagetoken", req.query.pageToken as string);
+      }
+      
       const r = await fetch(nearbyUrl.toString());
       const data = await r.json();
       if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
         rawError = data;
       }
       places = Array.isArray(data.results) ? data.results : [];
+      nextPageToken = data.next_page_token || null;
     } else {
       // Text search without lat/lng; rely on query text + city/state
       const textUrl = new URL(
@@ -98,12 +116,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       textUrl.searchParams.set("query", queryParts.join(" "));
       textUrl.searchParams.set("key", googleKey);
 
+      // Handle pagination for text search
+      if (page > 1 && req.query.pageToken) {
+        textUrl.searchParams.set("pagetoken", req.query.pageToken as string);
+      }
+      
       const r = await fetch(textUrl.toString());
       const data = await r.json();
       if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
         rawError = data;
       }
       places = Array.isArray(data.results) ? data.results : [];
+      nextPageToken = data.next_page_token || null;
     }
   } catch (e: any) {
     return res.status(500).json({
@@ -112,7 +136,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  places = places.slice(0, limit);
+  // Don't slice here since Google API already limits results per page
 
   // Optional OpenAI enrichment for vibe-tailored 1-liner descriptions
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -183,6 +207,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   return res.status(200).json({
     items,
+    nextPageToken,
+    hasMore: !!nextPageToken,
+    page,
     debug: {
       rawStatus: rawError?.status || "OK",
       radiusMeters: radius ?? null,

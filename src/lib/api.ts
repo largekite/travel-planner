@@ -1,4 +1,6 @@
 // src/lib/api.ts
+import { getCached, setCache } from './cache';
+
 export type ApiSuggestion = {
   name: string;
   url?: string;
@@ -23,28 +25,77 @@ export function detectApiBase(): string {
     
     // Fallback to same origin
     if ((window as any).location) {
-      return window.location.origin;
+      const origin = window.location.origin;
+      // If running on Vite dev server (5173), try localhost:3000 for Vercel dev
+      if (origin.includes(':5173')) {
+        return 'http://localhost:3000';
+      }
+      return origin;
     }
   }
   return "";
+}
+
+export async function fetchAllPlaces(
+  apiBase: string,
+  params: URLSearchParams,
+  maxPages: number = 3,
+  signal?: AbortSignal
+): Promise<{ items: ApiSuggestion[]; raw: any }> {
+  let allItems: ApiSuggestion[] = [];
+  let pageToken: string | undefined;
+  let page = 1;
+  
+  while (page <= maxPages) {
+    const currentParams = new URLSearchParams(params);
+    currentParams.set('page', page.toString());
+    if (pageToken) {
+      currentParams.set('pageToken', pageToken);
+    }
+    
+    const result = await fetchPlaces(apiBase, currentParams, signal);
+    allItems = allItems.concat(result.items);
+    
+    if (!result.hasMore || !result.nextPageToken) break;
+    
+    pageToken = result.nextPageToken;
+    page++;
+    
+    // Small delay to respect API rate limits
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  
+  return { items: allItems, raw: {} };
 }
 
 export async function fetchPlaces(
   apiBase: string,
   params: URLSearchParams,
   signal?: AbortSignal
-): Promise<{ items: ApiSuggestion[]; raw: any }> {
+): Promise<{ items: ApiSuggestion[]; raw: any; hasMore?: boolean; nextPageToken?: string }> {
   const base = apiBase.replace(/\/$/, "");
   const url = `${base}/api/places?${params.toString()}`;
+  
+  // Check cache first
+  const cacheKey = url;
+  const cached = getCached(cacheKey);
+  if (cached) {
+    return cached;
+  }
 
   const res = await fetch(url, { signal });
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    const text = await res.text();
+    throw new Error(`HTTP ${res.status} ${res.statusText}: ${text.slice(0, 200)}`);
   }
   
   let data;
   try {
-    data = await res.json();
+    const text = await res.text();
+    if (!text.trim().startsWith('{') && !text.trim().startsWith('[')) {
+      throw new Error(`Expected JSON but got: ${text.slice(0, 200)}`);
+    }
+    data = JSON.parse(text);
   } catch (e) {
     throw new Error(`Invalid JSON response: ${e}`);
   }
@@ -75,7 +126,17 @@ export async function fetchPlaces(
       : undefined,
   }));
 
-  return { items, raw: data };
+  const result = { 
+    items, 
+    raw: data, 
+    hasMore: data.hasMore,
+    nextPageToken: data.nextPageToken
+  };
+  
+  // Cache the result
+  setCache(cacheKey, result);
+  
+  return result;
 }
 
 export async function fetchDayNotes(
