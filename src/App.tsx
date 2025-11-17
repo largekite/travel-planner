@@ -1,173 +1,101 @@
-import React, { useEffect, useState } from "react";
-import { Printer, Share2 } from "lucide-react";
+import React, { useState, useEffect } from "react";
 import TopBar from "./components/TopBar";
 import HotelSection from "./components/HotelSection";
 import DayPlanner from "./components/DayPlanner";
+import InteractiveMap from "./components/InteractiveMap";
 import SuggestionModal from "./components/SuggestionModal";
-import MapPanel from "./components/MapPanel";
-import {
-  DayPlan,
-  SelectedItem,
-  SlotKey,
-  Vibe,
-  ApiSuggestion,
-  DirectionsSegment,
-} from "./lib/types";
-import {
-  fetchPlaces,
-  fetchDayNotes,
-  fetchDirections,
-  detectApiBase,
-} from "./lib/api";
-
-// slots in the order they show up on the map
-const SLOT_SEQUENCE: (keyof DayPlan)[] = [
-  "breakfast",
-  "activity",
-  "lunch",
-  "coffee",
-  "dinner",
-];
-
-// safe clone for day data (no structuredClone)
-function cloneDay(d: DayPlan | undefined): DayPlan {
-  return {
-    activity: d?.activity ? { ...d.activity } : undefined,
-    breakfast: d?.breakfast ? { ...d.breakfast } : undefined,
-    lunch: d?.lunch ? { ...d.lunch } : undefined,
-    dinner: d?.dinner ? { ...d.dinner } : undefined,
-    coffee: d?.coffee ? { ...d.coffee } : undefined,
-    notes: d?.notes ?? undefined,
-  };
-}
+import { Vibe, DayPlan, SelectedItem, SlotKey, ApiSuggestion } from "./lib/types";
+import { detectApiBase, fetchPlaces } from "./lib/api";
 
 export default function App() {
   const API_BASE = detectApiBase();
-
-  // global trip state
   const [country, setCountry] = useState("USA");
   const [city, setCity] = useState("St. Louis");
   const [vibe, setVibe] = useState<Vibe>("romantic");
   const [daysCount, setDaysCount] = useState(3);
   const [currentDay, setCurrentDay] = useState(1);
-  const [plan, setPlan] = useState<DayPlan[]>(
-    () => Array.from({ length: 3 }, () => ({}))
-  );
-
-  // hotel / center
+  const [plan, setPlan] = useState<DayPlan[]>(() => Array.from({ length: 3 }, () => ({})));
   const [hotel, setHotel] = useState<SelectedItem | null>(null);
-
-  // modal
   const [slotModalOpen, setSlotModalOpen] = useState(false);
   const [slotKey, setSlotKey] = useState<SlotKey>("activity");
+  const [apiOk, setApiOk] = useState<boolean | null>(null);
+  const [apiLatency, setApiLatency] = useState<number | null>(null);
+  const [apiMsg, setApiMsg] = useState<string | null>(null);
+  const [liveItems, setLiveItems] = useState<ApiSuggestion[]>([]);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveError, setLiveError] = useState<string | null>(null);
   const [areaFilter, setAreaFilter] = useState("");
   const [useNearFilter, setUseNearFilter] = useState(false);
   const [nearMode, setNearMode] = useState<"walk" | "drive">("walk");
   const [nearMaxMins, setNearMaxMins] = useState(15);
-  const [sortMode, setSortMode] = useState<"default" | "distance" | "rating">(
-    "default"
-  );
+  const [sortMode, setSortMode] = useState<"default" | "distance" | "rating">("default");
 
-  // suggestions
-  const [liveItems, setLiveItems] = useState<ApiSuggestion[]>([]);
-  const [liveLoading, setLiveLoading] = useState(false);
-  const [liveError, setLiveError] = useState<string | null>(null);
-  const [lastFetchUrl, setLastFetchUrl] = useState("");
-  const [lastResultCount, setLastResultCount] = useState(0);
-
-  // directions / map
-  const [dirSegs, setDirSegs] = useState<DirectionsSegment[] | null>(null);
-  const [dirErr, setDirErr] = useState<string | null>(null);
-
-  // API status
-  const [apiOk, setApiOk] = useState<boolean | null>(null);
-  const [apiLatency, setApiLatency] = useState<number | null>(null);
-  const [apiMsg, setApiMsg] = useState<string | null>(null);
-
-  // keep days array in sync
-  useEffect(() => {
-    setPlan((prev) => {
-      const copy = [...prev];
-      if (daysCount > copy.length) {
-        return copy.concat(
-          Array.from({ length: daysCount - copy.length }, () => ({}))
-        );
-      }
-      if (daysCount < copy.length) {
-        return copy.slice(0, daysCount);
-      }
-      return copy;
-    });
-    setCurrentDay((d) => Math.max(1, Math.min(daysCount, d)));
-  }, [daysCount]);
-
-  const currentDayData = plan[currentDay - 1] || {};
-  const chosenItems = SLOT_SEQUENCE.map((k) => currentDayData[k]).filter(
-    Boolean
-  ) as SelectedItem[];
-
-  // ping API so top bar shows status
+  // API status check
   useEffect(() => {
     if (!API_BASE) {
       setApiOk(null);
       setApiMsg("API base not configured");
       return;
     }
-    let cancelled = false;
     const ping = async () => {
       const start = performance.now();
       try {
-        const r = await fetch(
-          `${API_BASE}/api/places?city=test&slot=activity&limit=1`
-        );
+        const r = await fetch(`${API_BASE}/api/places?city=test&slot=activity&limit=1`);
         const latency = Math.round(performance.now() - start);
-        if (!cancelled) {
-          setApiLatency(latency);
-          setApiOk(r.ok);
-          setApiMsg(r.ok ? "OK" : `HTTP ${r.status}`);
-        }
+        setApiLatency(latency);
+        setApiOk(r.ok);
+        setApiMsg(r.ok ? "OK" : `HTTP ${r.status}`);
       } catch (e: any) {
-        if (!cancelled) {
-          setApiOk(false);
-          setApiLatency(null);
-          setApiMsg(String(e?.message || "error"));
-        }
+        setApiOk(false);
+        setApiLatency(null);
+        setApiMsg(String(e?.message || "error"));
       }
     };
     ping();
-    const id = setInterval(ping, 60000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
   }, [API_BASE]);
 
-  // directions fetch
-  useEffect(() => {
-    if (!API_BASE) return;
-    if (chosenItems.length < 2) {
-      setDirSegs(null);
-      setDirErr(null);
-      return;
-    }
-    fetchDirections(API_BASE, city, chosenItems)
-      .then((res) => {
-        setDirSegs(res);
-        setDirErr(null);
-      })
-      .catch((err) => {
-        setDirErr(String(err?.message || err));
-        setDirSegs(null);
-      });
-  }, [API_BASE, city, JSON.stringify(chosenItems.map((c) => c.name))]);
-
-  // open picker
   function openSlot(slot: SlotKey) {
     setSlotKey(slot);
     setSlotModalOpen(true);
+    fetchSuggestions(slot);
   }
 
-  // choose suggestion -> set slot + fetch notes
+  async function fetchSuggestions(slot: SlotKey) {
+    if (!API_BASE) return;
+    setLiveLoading(true);
+    setLiveError(null);
+    
+    const params = new URLSearchParams({
+      city,
+      vibe,
+      slot,
+      limit: "10",
+      near: String(useNearFilter),
+      mode: nearMode,
+      maxMins: String(nearMaxMins),
+      lat: hotel?.lat ? String(hotel.lat) : "",
+      lng: hotel?.lng ? String(hotel.lng) : "",
+      area: areaFilter || "",
+    });
+
+    try {
+      const { items } = await fetchPlaces(API_BASE, params);
+      setLiveItems(items);
+    } catch (err: any) {
+      setLiveError(String(err?.message || err));
+      setLiveItems([]);
+    } finally {
+      setLiveLoading(false);
+    }
+  }
+
+  // Refetch when filters change
+  useEffect(() => {
+    if (slotModalOpen) {
+      fetchSuggestions(slotKey);
+    }
+  }, [useNearFilter, nearMode, nearMaxMins, areaFilter, hotel?.lat, hotel?.lng]);
+
   function chooseForSlot(item: ApiSuggestion) {
     const sel: SelectedItem = {
       name: item.name,
@@ -181,14 +109,12 @@ export default function App() {
       meta: item.meta,
     };
 
-    // hotel uses same modal
     if (slotKey === "hotel") {
       setHotel(sel);
       setSlotModalOpen(false);
       return;
     }
 
-    // 1) set the slot
     setPlan((prev) => {
       const next = prev.map((d) => ({ ...d }));
       const idx = currentDay - 1;
@@ -196,86 +122,8 @@ export default function App() {
       return next;
     });
 
-    // 2) ask backend to generate notes for this day (non-hardcoded)
-    if (API_BASE) {
-      const dayIdx = currentDay;
-      const snapshot = cloneDay({ ...currentDayData, [slotKey]: sel });
-      fetchDayNotes(API_BASE, dayIdx, city, vibe, snapshot)
-        .then((notes) => {
-          if (!notes) return;
-          setPlan((prev) => {
-            const next = prev.map((d) => ({ ...d }));
-            next[dayIdx - 1].notes = notes;
-            return next;
-          });
-        })
-        .catch(() => {
-          // ignore notes error, UI still works
-        });
-    }
-
     setSlotModalOpen(false);
   }
-
-  // fetch suggestions whenever modal is open or filters change
-// inside App.tsx
-useEffect(() => {
-  if (!slotModalOpen) return;
-  if (!API_BASE) {
-    setLiveItems([]);
-    setLiveError("API base not configured");
-    return;
-  }
-
-  const ctrl = new AbortController();
-  setLiveLoading(true);
-
-  const params = new URLSearchParams({
-    city,
-    vibe,
-    slot: slotKey,
-    limit: "10",
-    near: String(useNearFilter),
-    mode: nearMode,
-    maxMins: String(nearMaxMins),
-    lat: hotel?.lat ? String(hotel.lat) : "",
-    lng: hotel?.lng ? String(hotel.lng) : "",
-    area: areaFilter || "",
-    q: `Suggest top ${slotKey} places in ${city} for a ${vibe} vibe${
-      areaFilter ? " around " + areaFilter : ""
-    }`,
-  });
-
-  fetchPlaces(API_BASE, params, ctrl.signal)
-    .then(({ items, raw }) => {
-      setLiveItems(items);
-      setLiveError(null);
-      setLastFetchUrl(`${API_BASE}/api/places?${params.toString()}`);
-      setLastResultCount(items.length);
-    })
-    .catch((err) => {
-      if ((err as any).name !== "AbortError") {
-        setLiveError(String(err?.message || err));
-      }
-      setLiveItems([]);
-    })
-    .finally(() => setLiveLoading(false));
-
-  return () => ctrl.abort();
-}, [
-  slotModalOpen,
-  city,
-  vibe,
-  slotKey,
-  useNearFilter,
-  nearMode,
-  nearMaxMins,
-  hotel?.lat,
-  hotel?.lng,
-  areaFilter,
-  API_BASE,
-]);
-
 
   function clearDay(dayIndex1Based: number) {
     setPlan((prev) => {
@@ -283,10 +131,6 @@ useEffect(() => {
       next[dayIndex1Based - 1] = {};
       return next;
     });
-  }
-
-  function handlePrint() {
-    window.print();
   }
 
   return (
@@ -323,73 +167,17 @@ useEffect(() => {
             clearDay={clearDay}
             setPlan={setPlan}
           />
-
-          <MapPanel
-            currentDay={currentDay}
-            hotel={hotel}
-            chosenItems={chosenItems}
-            dirSegs={dirSegs}
-            dirErr={dirErr}
-          />
-        </div>
-
-        {/* Plan view */}
-        <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="font-semibold">Plan View</div>
-            <div className="flex items-center gap-2">
-              <button className="px-3 py-1.5 rounded-lg border bg-white text-sm flex items-center gap-2">
-                <Share2 className="w-4 h-4" />
-                Share
-              </button>
-              <button
-                onClick={handlePrint}
-                className="px-3 py-1.5 rounded-lg border bg-slate-50 text-sm flex items-center gap-2"
-              >
-                <Printer className="w-4 h-4" />
-                Print
-              </button>
+          
+          <div className="bg-white/90 backdrop-blur rounded-2xl border p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-semibold">Map - Day {currentDay}</div>
             </div>
-          </div>
-          <div className="mt-3 overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-500">
-                  <th className="py-2 pr-4">Day</th>
-                  <th className="py-2 pr-4">Breakfast</th>
-                  <th className="py-2 pr-4">Activity</th>
-                  <th className="py-2 pr-4">Lunch</th>
-                  <th className="py-2 pr-4">Coffee</th>
-                  <th className="py-2 pr-4">Dinner</th>
-                  <th className="py-2 pr-4">Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plan.map((d, i) => (
-                  <tr key={i} className="border-t align-top">
-                    <td className="py-2 pr-4 font-medium">Day {i + 1}</td>
-                    <td className="py-2 pr-4">
-                      {d.breakfast?.name || <span className="text-slate-400">—</span>}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {d.activity?.name || <span className="text-slate-400">—</span>}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {d.lunch?.name || <span className="text-slate-400">—</span>}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {d.coffee?.name || <span className="text-slate-400">—</span>}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {d.dinner?.name || <span className="text-slate-400">—</span>}
-                    </td>
-                    <td className="py-2 pr-4 max-w-[320px] truncate" title={d.notes}>
-                      {d.notes || <span className="text-slate-400">—</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <InteractiveMap
+              hotel={hotel ? { name: hotel.name, lat: hotel.lat, lng: hotel.lng, area: hotel.area, url: hotel.url } : null}
+              places={[]}
+              mode="WALKING"
+              showRoute={true}
+            />
           </div>
         </div>
 
@@ -412,8 +200,6 @@ useEffect(() => {
           onChoose={chooseForSlot}
           sortMode={sortMode}
           setSortMode={setSortMode}
-          lastFetchUrl={lastFetchUrl}
-          lastResultCount={lastResultCount}
         />
       </div>
     </div>
