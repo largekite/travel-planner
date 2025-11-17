@@ -62,7 +62,7 @@ export default function MapPanel({
       (typeof window !== "undefined" &&
         (window as any).__GOOGLE_MAPS_KEY) ||
       (typeof import.meta !== "undefined" &&
-        (import.meta as any).env?.VITE_GOOGLE_MAPS_KEY);
+        (import.meta as any).env?.VITE_GOOGLE_PLACES_API_KEY);
     if (!key) return; // no key, fallback to SVG
 
     if (typeof window !== "undefined" && !(window as any).google) {

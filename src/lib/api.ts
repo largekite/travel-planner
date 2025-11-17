@@ -1,19 +1,5 @@
 // src/lib/api.ts
-export type ApiSuggestion = {
-  name: string;
-  url?: string;
-  area?: string;
-  cuisine?: string;
-  price?: string;
-  lat?: number;
-  lng?: number;
-  desc?: string;
-  meta?: string;
-  ratings?: {
-    google?: number;
-    googleReviews?: number;
-  };
-};
+import { ApiSuggestion, DirectionsSegment } from './types';
 
 export function detectApiBase(): string {
   if (typeof window !== "undefined" && (window as any).location) {
@@ -89,13 +75,7 @@ export async function fetchDayNotes(
   return data.notes || null;
 }
 
-export type DirectionsSegment = {
-  from: string;
-  to: string;
-  mins: number;
-  mode: "walk" | "drive";
-  path?: [number, number][];
-};
+
 
 export async function fetchDirections(
   apiBase: string,
