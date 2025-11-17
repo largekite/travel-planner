@@ -355,7 +355,7 @@ useEffect(() => {
         const params = new URLSearchParams({
           city, vibe, slot, limit: "1"
         });
-        return fetchPlaces(API_BASE, params).then(result => ({ slot, items: result.items }));
+        return fetchAllPlaces(API_BASE, params, 1).then(result => ({ slot, items: result.items }));
       });
       
       const results = await Promise.all(promises);
