@@ -1,6 +1,8 @@
 import React from "react";
 import { Wifi, Heart, Users, Mountain, Calendar } from "lucide-react";
 import { VIBES, Vibe } from "../lib/types";
+import AutocompleteInput from "./AutocompleteInput";
+import LocationButton from "./LocationButton";
 
 type Props = {
   apiOk: boolean | null;
@@ -66,11 +68,28 @@ export default function TopBar({
           <option value="USA">USA</option>
         </select>
         <span className="text-slate-600">City</span>
-        <input
+        <AutocompleteInput
           value={city}
-          onChange={(e) => setCity(e.target.value)}
+          onChange={setCity}
           placeholder="e.g., St. Louis"
           className="border rounded-lg p-1 w-44 bg-white"
+        />
+        <LocationButton
+          onLocationFound={(lat, lng) => {
+            // Reverse geocode to get city name
+            if (window.google?.maps) {
+              const geocoder = new google.maps.Geocoder();
+              geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+                if (status === "OK" && results?.[0]) {
+                  const city = results[0].address_components.find(c => 
+                    c.types.includes("locality")
+                  )?.long_name;
+                  if (city) setCity(city);
+                }
+              });
+            }
+          }}
+          className="text-xs"
         />
       </div>
       <div className="flex gap-2">

@@ -16,8 +16,15 @@ export type ApiSuggestion = {
 };
 
 export function detectApiBase(): string {
-  if (typeof window !== "undefined" && (window as any).location) {
-    return window.location.origin;
+  // Check for explicit API base first
+  if (typeof window !== "undefined") {
+    const envBase = (import.meta as any).env?.VITE_API_BASE;
+    if (envBase) return envBase;
+    
+    // Fallback to same origin
+    if ((window as any).location) {
+      return window.location.origin;
+    }
   }
   return "";
 }
@@ -34,7 +41,13 @@ export async function fetchPlaces(
   if (!res.ok) {
     throw new Error(`HTTP ${res.status} ${res.statusText}`);
   }
-  const data = await res.json();
+  
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    throw new Error(`Invalid JSON response: ${e}`);
+  }
 
   // normalize: accept {items:[]}, {results:[]}, or a bare array
   const rawItems: any[] = Array.isArray(data)
@@ -85,7 +98,15 @@ export async function fetchDayNotes(
     }),
   });
   if (!res.ok) return null;
-  const data = await res.json();
+  
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    console.error('JSON parse error in fetchDayNotes:', e);
+    return null;
+  }
+  
   return data.notes || null;
 }
 
@@ -94,7 +115,7 @@ export type DirectionsSegment = {
   to: string;
   mins: number;
   mode: "walk" | "drive";
-  path?: [number, number][];
+  path: [number, number][];
 };
 
 export async function fetchDirections(
@@ -111,6 +132,14 @@ export async function fetchDirections(
   )}&coords=${encodeURIComponent(coordsStr)}`;
   const res = await fetch(url);
   if (!res.ok) return [];
-  const data = await res.json();
+  
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    console.error('JSON parse error in fetchDirections:', e);
+    return [];
+  }
+  
   return Array.isArray(data.directions) ? data.directions : [];
 }
