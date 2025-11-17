@@ -204,6 +204,8 @@ export default function App() {
   function openSlot(slot: SlotKey) {
     setSlotKey(slot);
     setSlotModalOpen(true);
+    // Clear any existing items to force fresh fetch
+    setLiveItems([]);
   }
 
   // choose suggestion -> set slot + fetch notes
