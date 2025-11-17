@@ -148,7 +148,7 @@ export default function InteractiveMap({
                   rel="noreferrer"
                   className="text-xs text-blue-700 underline"
                 >
-                  Open link
+                  Open in Google Maps
                 </a>
               )}
             </div>
