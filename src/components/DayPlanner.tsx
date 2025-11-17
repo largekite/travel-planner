@@ -7,7 +7,7 @@ type Props = {
   plan: DayPlan[];
   openSlot: (slot: any) => void;
   clearDay: (day: number) => void;
-  setPlan: React.Dispatch<React.SetStateAction<DayPlan[]>>;
+  setPlan: (plan: DayPlan[]) => void;
 };
 
 function SlotButton({
@@ -86,16 +86,14 @@ export default function DayPlanner({
       </div>
       <textarea
         value={cur.notes || ""}
-        onChange={(e) =>
-          setPlan((prev) => {
-            const next = [...prev];
-            next[currentDay - 1] = {
-              ...next[currentDay - 1],
-              notes: e.target.value,
-            };
-            return next;
-          })
-        }
+        onChange={(e) => {
+          const next = [...plan];
+          next[currentDay - 1] = {
+            ...next[currentDay - 1],
+            notes: e.target.value,
+          };
+          setPlan(next);
+        }}
         placeholder="Notes will appear here after API generates them. You can edit."
         className="mt-3 w-full border rounded-lg p-2 text-sm bg-white min-h-[90px]"
       />
