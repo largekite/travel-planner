@@ -563,9 +563,9 @@ function MapView({
                     : [],
                 optimizeWaypoints: false,
               }}
-              callback={(res) => {
-                if (!res) return;
-                if (res.status === "OK") {
+              callback={(res, status) => {
+                if (!res || !status) return;
+                if (status === "OK") {
                   setDirections(res);
                   setDirectionsError(null);
                   // refit bounds when we have directions
@@ -576,7 +576,7 @@ function MapView({
                   }
                 } else {
                   setDirections(null);
-                  setDirectionsError(res.status);
+                  setDirectionsError(status);
                 }
               }}
             />

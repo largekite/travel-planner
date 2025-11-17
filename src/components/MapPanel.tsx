@@ -61,56 +61,64 @@ export default function MapPanel({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // 1) optional global override (for experimentation)
-    // 2) main source: Vite env var VITE_GOOGLE_MAPS_API_KEY
-    const key =
-      (window as any).__GOOGLE_MAPS_KEY ||
-      (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY;
+    const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
     if (!key) {
-      console.warn(
-        "MapPanel: no VITE_GOOGLE_MAPS_API_KEY (or window.__GOOGLE_MAPS_KEY) found – using SVG fallback."
-      );
+      console.warn("MapPanel: no VITE_GOOGLE_MAPS_API_KEY found – using SVG fallback.");
       return;
     }
 
     // If Google Maps JS is already loaded, just mark as ready.
-    if ((window as any).google && (window as any).google.maps) {
+    if ((window as any).google && (window as any).google.maps && (window as any).google.maps.Map) {
       setMapReady(true);
       return;
     }
 
-    // Inject the script tag once.
-    const existing = document.querySelector<HTMLScriptElement>(
-      'script[data-largekite-maps="1"]'
-    );
+    // Check if script is already being loaded
+    const existing = document.querySelector('script[src*="maps.googleapis.com"]');
     if (existing) {
-      existing.addEventListener("load", () => setMapReady(true), { once: true });
+      (window as any).initGoogleMaps = () => setMapReady(true);
+      const checkLoaded = () => {
+        if ((window as any).google && (window as any).google.maps && (window as any).google.maps.Map) {
+          setMapReady(true);
+        } else {
+          setTimeout(checkLoaded, 100);
+        }
+      };
+      checkLoaded();
       return;
     }
 
-    const s = document.createElement("script");
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}`;
-    s.async = true;
-    s.defer = true;
-    s.dataset.largekiteMaps = "1";
-    s.onload = () => setMapReady(true);
-    s.onerror = () => {
-      console.error("MapPanel: failed to load Google Maps JS – falling back to SVG.");
+    (window as any).initGoogleMaps = () => setMapReady(true);
+    
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&loading=async&callback=initGoogleMaps`;
+    script.async = true;
+    script.defer = true;
+    script.onerror = () => {
+      console.error('Failed to load Google Maps script');
     };
-    document.head.appendChild(s);
+    document.head.appendChild(script);
   }, []);
 
   // Initialize the map when the script is ready and we have a container.
   useEffect(() => {
-    if (!mapReady) return;
-    if (!mapRef.current) return;
-
-    const g = (window as any).google;
-    if (!g || !g.maps) {
-      console.error("MapPanel: google.maps not available after script load.");
+    if (!mapReady) {
       return;
     }
+
+    // Small delay to ensure DOM is ready
+    const initMap = () => {
+      if (!mapRef.current) {
+        setTimeout(initMap, 50);
+        return;
+      }
+
+      const g = (window as any).google;
+      if (!g || !g.maps || !g.maps.Map) {
+        setTimeout(initMap, 100);
+        return;
+      }
 
     const center = hotel?.lat && hotel.lng
       ? { lat: hotel.lat, lng: hotel.lng }
@@ -152,7 +160,10 @@ export default function MapPanel({
       });
     }
 
-    setUsedGoogle(true);
+      setUsedGoogle(true);
+    };
+
+    initMap();
   }, [
     mapReady,
     hotel?.lat,
@@ -193,9 +204,8 @@ export default function MapPanel({
         </div>
       </div>
 
-      {usedGoogle ? (
-        <div ref={mapRef} className="w-full h-[320px] rounded-xl border" />
-      ) : (
+      <div ref={mapRef} className="w-full h-[320px] rounded-xl border" style={{ display: usedGoogle ? 'block' : 'none' }} />
+      {!usedGoogle && (
         <svg
           viewBox="0 0 100 100"
           className="w-full aspect-square rounded-xl border bg-slate-50"
