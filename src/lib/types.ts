@@ -46,6 +46,11 @@ export type ApiSuggestion = {
     yelpReviews?: number;
     googleReviews?: number;
   };
+  photos?: string[];
+  hours?: string[];
+  phone?: string;
+  website?: string;
+  placeId?: string;
 };
 
 export type DirectionsSegment = {
@@ -54,4 +59,11 @@ export type DirectionsSegment = {
   mode: "walk" | "drive";
   from: string;
   to: string;
+};
+
+export type RouteOptimization = {
+  originalOrder: SelectedItem[];
+  optimizedOrder: SelectedItem[];
+  totalTime: number;
+  totalDistance: number;
 };

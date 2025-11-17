@@ -148,7 +148,7 @@ export default function InteractiveMap({
   return (
     <div style={{ height }} className="rounded-xl overflow-hidden border">
       <GoogleMap
-        onLoad={(m) => (mapRef.current = m)}
+        onLoad={(m) => { mapRef.current = m; }}
         center={center}
         zoom={12}
         mapContainerStyle={{ height: "100%", width: "100%" }}
@@ -241,14 +241,14 @@ export default function InteractiveMap({
                 waypoints,
                 optimizeWaypoints: false, // keep user’s selected order
               }}
-              callback={(res) => {
-                if (!res) return;
-                if (res.status === "OK") {
+              callback={(res, status) => {
+                if (!res || !status) return;
+                if (status === "OK") {
                   setDirections(res);
                   setDirectionsError(null);
                 } else {
                   setDirections(null);
-                  setDirectionsError(res.status);
+                  setDirectionsError(status);
                 }
               }}
             />

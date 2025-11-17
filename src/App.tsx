@@ -19,6 +19,8 @@ import {
   fetchDirections,
   detectApiBase,
 } from "./lib/api";
+import { optimizeRoute } from "./lib/routeOptimizer";
+import LocationButton from "./components/LocationButton";
 
 // slots in the order they show up on the map
 const SLOT_SEQUENCE: (keyof DayPlan)[] = [
@@ -56,6 +58,9 @@ export default function App() {
 
   // hotel / center
   const [hotel, setHotel] = useState<SelectedItem | null>(null);
+  
+  // route optimization
+  const [showOptimization, setShowOptimization] = useState(false);
 
   // modal
   const [slotModalOpen, setSlotModalOpen] = useState(false);
@@ -314,15 +319,161 @@ useEffect(() => {
           setHotel={setHotel}
           apiBase={API_BASE}
         />
+        
+        {/* Route Optimization Panel */}
+        {chosenItems.length > 2 && (
+          <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <div className="font-semibold">Route Optimization</div>
+              <button
+                onClick={() => setShowOptimization(!showOptimization)}
+                className="px-3 py-1.5 rounded-lg border bg-white text-sm"
+              >
+                {showOptimization ? 'Hide' : 'Optimize Route'}
+              </button>
+            </div>
+            
+            {showOptimization && (() => {
+              const optimization = optimizeRoute(
+                chosenItems, 
+                hotel ? { lat: hotel.lat!, lng: hotel.lng! } : undefined,
+                "walk"
+              );
+              
+              return (
+                <div className="space-y-3">
+                  <div className="text-sm text-slate-600">
+                    Optimized route saves ~{Math.max(0, chosenItems.length * 5 - optimization.totalTime)} minutes
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <div className="font-medium mb-2">Current Order:</div>
+                      <div className="space-y-1">
+                        {chosenItems.map((item, i) => (
+                          <div key={i} className="text-slate-600">
+                            {i + 1}. {item.name}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <div className="font-medium mb-2">Optimized Order:</div>
+                      <div className="space-y-1">
+                        {optimization.optimizedOrder.map((item, i) => (
+                          <div key={i} className="text-slate-600">
+                            {i + 1}. {item.name}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-2 text-xs text-slate-500">
+                        Total: {optimization.totalTime}min, {optimization.totalDistance}km
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => {
+                      // Apply optimization to current day
+                      const dayData = { ...currentDayData };
+                      const slots = ['breakfast', 'activity', 'lunch', 'coffee', 'dinner'] as const;
+                      
+                      // Clear current slots
+                      slots.forEach(slot => delete dayData[slot]);
+                      
+                      // Apply optimized order
+                      optimization.optimizedOrder.forEach((item, i) => {
+                        if (slots[i]) {
+                          dayData[slots[i]] = item;
+                        }
+                      });
+                      
+                      setPlan(prev => {
+                        const next = [...prev];
+                        next[currentDay - 1] = dayData;
+                        return next;
+                      });
+                      
+                      setShowOptimization(false);
+                    }}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
+                  >
+                    Apply Optimized Route
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-2 gap-5">
-          <DayPlanner
-            currentDay={currentDay}
-            plan={plan}
-            openSlot={openSlot}
-            clearDay={clearDay}
-            setPlan={setPlan}
-          />
+          <div className="space-y-4">
+            <DayPlanner
+              currentDay={currentDay}
+              plan={plan}
+              openSlot={openSlot}
+              clearDay={clearDay}
+              setPlan={setPlan}
+            />
+            
+            {/* Quick Location Actions */}
+            <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm">
+              <div className="font-semibold mb-3">Quick Actions</div>
+              <div className="flex gap-2 flex-wrap">
+                <LocationButton
+                  onLocationFound={(lat, lng) => {
+                    setHotel({
+                      name: "Current Location",
+                      lat,
+                      lng,
+                      area: "Your location"
+                    });
+                  }}
+                  className="text-sm"
+                />
+                <button
+                  onClick={() => {
+                    // Auto-fill day with popular places
+                    if (API_BASE) {
+                      const slots = ['breakfast', 'activity', 'lunch', 'coffee', 'dinner'];
+                      slots.forEach((slot, i) => {
+                        setTimeout(() => {
+                          const params = new URLSearchParams({
+                            city,
+                            vibe,
+                            slot,
+                            limit: "1"
+                          });
+                          fetchPlaces(API_BASE, params)
+                            .then(({ items }) => {
+                              if (items[0]) {
+                                setPlan(prev => {
+                                  const next = [...prev];
+                                  (next[currentDay - 1] as any)[slot] = {
+                                    name: items[0].name,
+                                    url: items[0].url,
+                                    area: items[0].area,
+                                    lat: items[0].lat,
+                                    lng: items[0].lng,
+                                    desc: items[0].desc
+                                  };
+                                  return next;
+                                });
+                              }
+                            })
+                            .catch(() => {});
+                        }, i * 200);
+                      });
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50 text-sm"
+                >
+                  Auto-fill Day
+                </button>
+              </div>
+            </div>
+          </div>
 
           <MapPanel
             currentDay={currentDay}
