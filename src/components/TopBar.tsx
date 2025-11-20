@@ -58,42 +58,9 @@ export default function TopBar({
             : `API: down (${apiMsg || "error"})`}
         </span>
       </div>
-      <div className="flex items-center gap-2 text-sm">
-        <span className="text-slate-600">Country</span>
-        <select
-          value={country}
-          onChange={(e) => setCountry(e.target.value)}
-          className="border rounded-lg p-1 bg-white"
-        >
-          <option value="USA">USA</option>
-        </select>
-        <span className="text-slate-600">City</span>
-        <AutocompleteInput
-          value={city}
-          onChange={setCity}
-          placeholder="e.g., St. Louis"
-          className="border rounded-lg p-1 w-44 bg-white"
-        />
-        <LocationButton
-          onLocationFound={(lat, lng) => {
-            // Reverse geocode to get city name
-            if (window.google?.maps) {
-              const geocoder = new google.maps.Geocoder();
-              geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-                if (status === "OK" && results?.[0]) {
-                  const city = results[0].address_components.find(c => 
-                    c.types.includes("locality")
-                  )?.long_name;
-                  if (city) setCity(city);
-                }
-              });
-            }
-          }}
-          className="text-xs"
-        />
-      </div>
+
       <div className="flex gap-2">
-        {VIBES.map((v) => (
+        {[...new Set(VIBES)].map((v) => (
           <button
             key={v}
             onClick={() => setVibe(v)}

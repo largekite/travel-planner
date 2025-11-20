@@ -39,33 +39,38 @@ export function detectApiBase(): string {
 export async function fetchAllPlaces(
   apiBase: string,
   params: URLSearchParams,
-  maxPages: number = 3,
+  maxPages: number = 2, // Reduced from 3 for speed
   signal?: AbortSignal
 ): Promise<{ items: ApiSuggestion[]; raw: any }> {
-  let allItems: ApiSuggestion[] = [];
-  let pageToken: string | undefined;
-  let page = 1;
+  // For first page, return immediately without waiting for additional pages
+  const firstResult = await fetchPlaces(apiBase, params, signal);
   
-  while (page <= maxPages) {
-    const currentParams = new URLSearchParams(params);
-    currentParams.set('page', page.toString());
-    if (pageToken) {
-      currentParams.set('pageToken', pageToken);
-    }
-    
-    const result = await fetchPlaces(apiBase, currentParams, signal);
-    allItems = allItems.concat(result.items);
-    
-    if (!result.hasMore || !result.nextPageToken) break;
-    
-    pageToken = result.nextPageToken;
-    page++;
-    
-    // Small delay to respect API rate limits
-    await new Promise(resolve => setTimeout(resolve, 50));
+  if (maxPages === 1 || !firstResult.hasMore || !firstResult.nextPageToken) {
+    return { items: firstResult.items, raw: firstResult.raw };
   }
   
-  return { items: allItems, raw: {} };
+  // Fetch additional pages concurrently (up to 2 more)
+  const additionalPromises: Promise<{ items: ApiSuggestion[]; raw: any }>[] = [];
+  let pageToken = firstResult.nextPageToken;
+  
+  for (let page = 2; page <= maxPages && pageToken; page++) {
+    const currentParams = new URLSearchParams(params);
+    currentParams.set('page', page.toString());
+    currentParams.set('pageToken', pageToken);
+    
+    additionalPromises.push(
+      fetchPlaces(apiBase, currentParams, signal).catch(() => ({ items: [], raw: {} }))
+    );
+    
+    // For Google Places, we can't get the next pageToken without the previous response
+    // So we break after scheduling one additional request
+    break;
+  }
+  
+  const additionalResults = await Promise.all(additionalPromises);
+  const allItems = [firstResult, ...additionalResults].flatMap(r => r.items);
+  
+  return { items: allItems, raw: firstResult.raw };
 }
 
 export async function fetchPlaces(
@@ -76,7 +81,7 @@ export async function fetchPlaces(
   const base = apiBase.replace(/\/$/, "");
   const url = `${base}/api/places?${params.toString()}`;
   
-  // Check cache first
+  // Check cache first (with shorter TTL for faster updates)
   const cacheKey = url;
   const cached = getCached(cacheKey);
   if (cached) {

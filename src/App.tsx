@@ -157,7 +157,7 @@ export default function App() {
       const start = performance.now();
       try {
         const r = await fetch(
-          `${API_BASE}/api/places?city=test&slot=activity&limit=1`
+          `${API_BASE}/api/places?health=1`
         );
         const latency = Math.round(performance.now() - start);
         if (!cancelled) {
@@ -568,19 +568,7 @@ useEffect(() => {
             <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm">
               <div className="font-semibold mb-3">Quick Actions</div>
               <div className="flex gap-2 flex-wrap">
-                <Tooltip content="Use your current location as hotel">
-                  <LocationButton
-                    onLocationFound={(lat, lng) => {
-                      setHotel({
-                        name: "Current Location",
-                        lat,
-                        lng,
-                        area: "Your location"
-                      });
-                    }}
-                    className="text-sm"
-                  />
-                </Tooltip>
+
                 
                 <Tooltip content="Automatically fill day with popular places">
                   <button

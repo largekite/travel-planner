@@ -1,9 +1,10 @@
 import React from 'react';
 import { MapPin, Clock, Users, Heart, Mountain } from 'lucide-react';
+import { VIBES, Vibe } from '../lib/types';
 
 const POPULAR_CITIES = ["St. Louis", "Chicago", "New York", "San Francisco", "Los Angeles", "Miami"];
 
-const VIBE_PRESETS = {
+const VIBE_PRESETS: Record<Vibe, { icon: any; slots: string[]; description: string; color: string }> = {
   romantic: { 
     icon: Heart, 
     slots: ["dinner", "coffee"], 
@@ -26,7 +27,7 @@ const VIBE_PRESETS = {
 
 type Props = {
   onCitySelect: (city: string) => void;
-  onVibeSelect: (vibe: keyof typeof VIBE_PRESETS) => void;
+  onVibeSelect: (vibe: Vibe) => void;
   onQuickFill: (preset: any) => void;
 };
 
@@ -52,34 +53,7 @@ export default function SmartDefaults({ onCitySelect, onVibeSelect, onQuickFill 
         </div>
       </div>
 
-      {/* Vibe Presets */}
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          <Clock className="w-4 h-4 text-slate-600" />
-          <span className="text-sm font-medium text-slate-700">Quick Start Templates</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          {Object.entries(VIBE_PRESETS).map(([vibe, preset]) => {
-            const Icon = preset.icon;
-            return (
-              <button
-                key={vibe}
-                onClick={() => {
-                  onVibeSelect(vibe as keyof typeof VIBE_PRESETS);
-                  onQuickFill(preset);
-                }}
-                className={`p-3 rounded-lg border-2 border-${preset.color}-200 bg-${preset.color}-50 hover:bg-${preset.color}-100 transition-colors text-left`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Icon className={`w-4 h-4 text-${preset.color}-600`} />
-                  <span className="font-medium capitalize">{vibe}</span>
-                </div>
-                <p className="text-xs text-slate-600">{preset.description}</p>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+
     </div>
   );
 }

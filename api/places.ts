@@ -31,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const city = ((req.query.city as string) || "").trim();
   const slot = ((req.query.slot as string) || "activity").trim();
   const vibe = ((req.query.vibe as string) || "romantic").trim();
-  const area = ((req.query.area as string) || "").trim();
+  const area = ((req.query.area as string) || (req.query.q as string) || "").trim();
   const near = (req.query.near as string) === "true";
   const mode = ((req.query.mode as string) || "walk").toLowerCase();
   const maxMins = Number(req.query.maxMins || 15);
@@ -51,17 +51,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
   const googleType = slotToQuery[slot] || "restaurant";
 
-  // Strong STL/Missouri hint if the city looks like St. Louis or if user types suburbs
-  const cityLower = city.toLowerCase();
-  const looksLikeStl =
-    cityLower.includes("st. louis") ||
-    cityLower.includes("st louis") ||
-    cityLower.includes("saint louis");
-
-  // If city is STL (or empty but area looks like a STL suburb), force Missouri
-  const locationHint = looksLikeStl || !city
-    ? "St. Louis, Missouri"
-    : city;
+  // Build location hint - use area if provided, otherwise city
+  const locationHint = area ? `${area} ${city}`.trim() : city || "St. Louis, Missouri";
 
   const useNearby = near && lat && lng;
   const radius = useNearby ? minutesToRadiusMeters(mode, maxMins) : undefined;
@@ -70,65 +61,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let nextPageToken: string | null = null;
   let rawError: any = null;
 
-  try {
+  // Build URL once
+  const buildUrl = (pageToken?: string) => {
     if (useNearby) {
-      // Nearby search with radius around center
-      const nearbyUrl = new URL(
-        "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-      );
-      nearbyUrl.searchParams.set("location", `${lat},${lng}`);
-      nearbyUrl.searchParams.set("radius", String(radius));
-      nearbyUrl.searchParams.set("type", googleType);
-
-      // Keep results in STL/MO; include area text plus a strong city/state hint
-      const keywordParts = [
-        slot,
-        area,
-        locationHint, // very important for Wildwood/Webster/Tower Grove
-        vibe,
-      ].filter(Boolean);
-      nearbyUrl.searchParams.set("keyword", keywordParts.join(" "));
-      nearbyUrl.searchParams.set("key", googleKey);
-
-      // Handle pagination for nearby search
-      if (page > 1 && req.query.pageToken) {
-        nearbyUrl.searchParams.set("pagetoken", req.query.pageToken as string);
-      }
-      
-      const r = await fetch(nearbyUrl.toString());
-      const data = await r.json();
-      if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-        rawError = data;
-      }
-      places = Array.isArray(data.results) ? data.results : [];
-      nextPageToken = data.next_page_token || null;
+      const url = new URL("https://maps.googleapis.com/maps/api/place/nearbysearch/json");
+      url.searchParams.set("location", `${lat},${lng}`);
+      url.searchParams.set("radius", String(radius));
+      url.searchParams.set("type", googleType);
+      const keywordParts = [slot, vibe, locationHint].filter(Boolean);
+      url.searchParams.set("keyword", keywordParts.join(" "));
+      url.searchParams.set("key", googleKey);
+      if (pageToken) url.searchParams.set("pagetoken", pageToken);
+      return url.toString();
     } else {
-      // Text search without lat/lng; rely on query text + city/state
-      const textUrl = new URL(
-        "https://maps.googleapis.com/maps/api/place/textsearch/json"
-      );
-      const queryParts = [
-        googleType,
-        area,
-        locationHint, // pushes to STL/MO instead of NJ/etc
-        vibe,
-      ].filter(Boolean);
-      textUrl.searchParams.set("query", queryParts.join(" "));
-      textUrl.searchParams.set("key", googleKey);
-
-      // Handle pagination for text search
-      if (page > 1 && req.query.pageToken) {
-        textUrl.searchParams.set("pagetoken", req.query.pageToken as string);
-      }
-      
-      const r = await fetch(textUrl.toString());
-      const data = await r.json();
-      if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-        rawError = data;
-      }
-      places = Array.isArray(data.results) ? data.results : [];
-      nextPageToken = data.next_page_token || null;
+      const url = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
+      const queryParts = [googleType, vibe, locationHint].filter(Boolean);
+      url.searchParams.set("query", queryParts.join(" "));
+      url.searchParams.set("key", googleKey);
+      if (pageToken) url.searchParams.set("pagetoken", pageToken);
+      return url.toString();
     }
+  };
+
+  try {
+    const url = buildUrl(page > 1 ? req.query.pageToken as string : undefined);
+    const r = await fetch(url);
+    const data = await r.json();
+    
+    if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+      rawError = data;
+    }
+    places = Array.isArray(data.results) ? data.results : [];
+    nextPageToken = data.next_page_token || null;
   } catch (e: any) {
     return res.status(500).json({
       error: "google fetch failed",
@@ -138,50 +102,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Don't slice here since Google API already limits results per page
 
-  // Optional OpenAI enrichment for vibe-tailored 1-liner descriptions
+  // Run OpenAI enrichment in parallel (non-blocking)
   const openaiKey = process.env.OPENAI_API_KEY;
   let aiDescriptions: Record<string, string> = {};
-  if (openaiKey && places.length > 0) {
-    try {
-      const names = places.map((p) => p.name).join(", ");
-      const prompt = `You are helping a travel planner. For these places in ${locationHint}, give a SHORT 1-sentence description tailored to a "${vibe}" vibe. Return JSON object keyed by exact place name.\nPlaces: ${names}`;
-      const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${openaiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [{ role: "user", content: prompt }],
-          temperature: 0.6,
-        }),
-      }).then((r) => r.json());
-      const text = aiRes?.choices?.[0]?.message?.content?.trim() || "{}";
+  
+  const aiPromise = openaiKey && places.length > 0 ? 
+    (async () => {
       try {
+        const names = places.slice(0, 10).map((p) => p.name).join(", "); // Limit to 10 for speed
+        const prompt = `For these ${locationHint} places, give SHORT 1-sentence descriptions for "${vibe}" vibe. Return JSON: ${names}`;
+        const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openaiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.6,
+            max_tokens: 500, // Limit response size
+          }),
+        });
+        const data = await aiRes.json();
+        const text = data?.choices?.[0]?.message?.content?.trim() || "{}";
         const parsed = JSON.parse(text);
-        if (parsed && typeof parsed === "object") {
-          aiDescriptions = parsed;
-        }
+        return parsed && typeof parsed === "object" ? parsed : {};
       } catch {
-        // ignore JSON parse errors
+        return {};
       }
-    } catch {
-      // ignore AI errors completely
-    }
-  }
+    })() : Promise.resolve({});
 
-  const items = places.map((p) => {
+  // Process places immediately while AI runs in background
+  const processedItems = places.map((p) => {
     const loc = p.geometry?.location;
     const name = p.name as string;
-    const desc = aiDescriptions[name];
-
-    // Always provide a Google Maps link via place_id
     const mapsUrl = p.place_id
       ? `https://www.google.com/maps/place/?q=place_id:${p.place_id}`
       : undefined;
 
-    // Simple slot → cuisine label for UI
     let cuisine: string | undefined;
     if (slot === "breakfast") cuisine = "Breakfast";
     else if (slot === "lunch") cuisine = "Lunch";
@@ -190,13 +149,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return {
       name,
-      url: mapsUrl,                       // <-- so your UI always has a link
+      url: mapsUrl,
       area: p.vicinity || p.formatted_address,
       cuisine,
       price: p.price_level != null ? "$".repeat(p.price_level) : undefined,
       lat: loc?.lat,
       lng: loc?.lng,
-      desc: desc,
       meta: useNearby ? `within ~${maxMins} min ${mode}` : undefined,
       ratings: {
         google: p.rating,
@@ -204,6 +162,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     };
   });
+
+  // Wait for AI descriptions (with timeout)
+  try {
+    aiDescriptions = await Promise.race([
+      aiPromise,
+      new Promise<Record<string, string>>(resolve => setTimeout(() => resolve({}), 2000)) // 2s timeout
+    ]);
+  } catch {
+    aiDescriptions = {};
+  }
+
+  // Add AI descriptions to processed items
+  const items = processedItems.map(item => ({
+    ...item,
+    desc: aiDescriptions[item.name] || undefined,
+  }));
 
   return res.status(200).json({
     items,
@@ -220,6 +194,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       area,
       mode,
       maxMins,
+      actualQuery: useNearby ? `keyword: ${[slot, vibe, locationHint].filter(Boolean).join(" ")}` : `query: ${[googleType, vibe, locationHint].filter(Boolean).join(" ")}`,
     },
   });
 }
