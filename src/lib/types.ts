@@ -14,6 +14,7 @@ export type SelectedItem = {
 };
 
 export type DayPlan = {
+  hotel?: SelectedItem;
   activity?: SelectedItem;
   breakfast?: SelectedItem;
   lunch?: SelectedItem;
@@ -22,12 +23,10 @@ export type DayPlan = {
   notes?: string;
 };
 
-export type SlotKey =
-  | keyof Pick<
-      DayPlan,
-      "activity" | "breakfast" | "lunch" | "dinner" | "coffee"
-    >
-  | "hotel";
+export type SlotKey = keyof Pick<
+  DayPlan,
+  "hotel" | "activity" | "breakfast" | "lunch" | "dinner" | "coffee"
+>;
 
 export type ApiSuggestion = {
   name: string;

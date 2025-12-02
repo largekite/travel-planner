@@ -35,6 +35,7 @@ import { useOnline } from "./hooks/useOnline";
 
 // slots in the order they show up on the map
 const SLOT_SEQUENCE: (keyof DayPlan)[] = [
+  "hotel",
   "breakfast",
   "activity",
   "lunch",
@@ -45,6 +46,7 @@ const SLOT_SEQUENCE: (keyof DayPlan)[] = [
 // safe clone for day data (no structuredClone)
 function cloneDay(d: DayPlan | undefined): DayPlan {
   return {
+    hotel: d?.hotel ? { ...d.hotel } : undefined,
     activity: d?.activity ? { ...d.activity } : undefined,
     breakfast: d?.breakfast ? { ...d.breakfast } : undefined,
     lunch: d?.lunch ? { ...d.lunch } : undefined,
@@ -222,13 +224,6 @@ export default function App() {
       meta: item.meta,
     };
 
-    // hotel uses same modal
-    if (slotKey === "hotel") {
-      setHotel(sel);
-      setSlotModalOpen(false);
-      return;
-    }
-
     // 1) set the slot
     const next = plan.map((d: DayPlan) => ({ ...d }));
     const idx = currentDay - 1;
@@ -352,10 +347,10 @@ useEffect(() => {
     const slots = ['breakfast', 'activity', 'lunch', 'coffee', 'dinner'];
     
     try {
-      // Make all requests concurrently for better performance
+      // Fetch more options to avoid duplicates
       const promises = slots.map(slot => {
         const params = new URLSearchParams({
-          city, vibe, slot, limit: "1"
+          city, vibe, slot, limit: "5"
         });
         return fetchAllPlaces(API_BASE, params, 1).then(result => ({ slot, items: result.items }));
       });
@@ -363,15 +358,20 @@ useEffect(() => {
       const results = await Promise.all(promises);
       
       const newPlan = [...plan];
+      const usedNames = new Set<string>();
+      
       results.forEach(({ slot, items }) => {
-        if (items[0]) {
+        // Find first item that hasn't been used
+        const availableItem = items.find(item => !usedNames.has(item.name));
+        if (availableItem) {
+          usedNames.add(availableItem.name);
           (newPlan[currentDay - 1] as any)[slot] = {
-            name: items[0].name,
-            url: items[0].url,
-            area: items[0].area,
-            lat: items[0].lat,
-            lng: items[0].lng,
-            desc: items[0].desc
+            name: availableItem.name,
+            url: availableItem.url,
+            area: availableItem.area,
+            lat: availableItem.lat,
+            lng: availableItem.lng,
+            desc: availableItem.desc
           };
         }
       });
