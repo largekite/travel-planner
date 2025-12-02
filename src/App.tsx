@@ -467,6 +467,7 @@ useEffect(() => {
           city={city}
           hotel={hotel}
           setHotel={setHotel}
+          setCity={setCity}
           apiBase={API_BASE}
         />
         

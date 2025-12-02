@@ -7,6 +7,7 @@ type Props = {
   city: string;
   hotel: SelectedItem | null;
   setHotel: (h: SelectedItem | null) => void;
+  setCity: (city: string) => void;
   apiBase: string;
 };
 
@@ -14,12 +15,28 @@ export default function HotelSection({
   city,
   hotel,
   setHotel,
+  setCity,
   apiBase,
 }: Props) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<SelectedItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  async function fetchLocationSuggestions(query: string) {
+    if (query.length < 3) return [];
+    try {
+      const response = await fetch(
+        `${apiBase}/api/autocomplete?input=${encodeURIComponent(query)}`
+      );
+      const data = await response.json();
+      return data.predictions || [];
+    } catch {
+      return [];
+    }
+  }
 
   async function searchHotels(q: string) {
     if (!apiBase) {
@@ -33,9 +50,9 @@ export default function HotelSection({
     setLoading(true);
     setError(null);
     const params = new URLSearchParams({
+      area: q,
       city,
       slot: "hotel",
-      q: `hotel ${q} in ${city}`,
       limit: "6",
     });
     try {
@@ -94,9 +111,23 @@ export default function HotelSection({
           <Search className="w-4 h-4 text-slate-500" />
           <input
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              searchHotels(e.target.value);
+            onChange={async (e) => {
+              const value = e.target.value;
+              setQuery(value);
+              
+              // Fetch location suggestions
+              const suggestions = await fetchLocationSuggestions(value);
+              setSuggestions(suggestions);
+              
+              if (searchTimeout) clearTimeout(searchTimeout);
+              const timeout = setTimeout(() => searchHotels(value), 300);
+              setSearchTimeout(timeout);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                if (searchTimeout) clearTimeout(searchTimeout);
+                searchHotels(query);
+              }
             }}
             placeholder="e.g., Marriott, Central West End"
             className="outline-none w-full text-sm"
@@ -112,6 +143,25 @@ export default function HotelSection({
       </div>
       {error && <div className="text-xs text-amber-700 mb-2">{error}</div>}
       {loading && <div className="text-xs text-slate-500">Searching…</div>}
+      {suggestions.length > 0 && (
+        <div className="border rounded-xl p-2 bg-blue-50 mb-2">
+          <div className="text-xs text-blue-700 mb-1">Did you mean:</div>
+          {suggestions.map((suggestion, i) => (
+            <button
+              key={i}
+              onClick={() => {
+                setQuery(suggestion);
+                setSuggestions([]);
+                setCity(suggestion);
+                searchHotels(suggestion);
+              }}
+              className="block w-full text-left py-1 px-2 hover:bg-blue-100 rounded text-sm"
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
+      )}
       {results.length > 0 && (
         <div className="border rounded-xl p-2 bg-slate-50 max-h-48 overflow-auto">
           {results.map((h, i) => (
