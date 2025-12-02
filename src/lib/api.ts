@@ -124,6 +124,7 @@ export async function fetchPlaces(
     lng: typeof p.lng === "number" ? p.lng : p.geometry?.location?.lng,
     desc: p.desc || p.description,
     meta: p.meta,
+    placeId: p.placeId,
     ratings: p.ratings
       ? p.ratings
       : p.rating
