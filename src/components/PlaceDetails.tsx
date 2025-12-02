@@ -24,14 +24,31 @@ export default function PlaceDetails({ place, onClose }: Props) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('Full place object:', place);
+    console.log('Place placeId:', place.placeId);
+    
+    // Skip API call if no placeId
+    if (!place.placeId) {
+      setDetails({
+        photos: [],
+        reviews: [],
+        hours: [],
+        phone: undefined,
+        website: place.url
+      });
+      setLoading(false);
+      return;
+    }
+
     async function fetchPlaceDetails() {
       try {
-        const response = await fetch(`/api/place-details?placeId=${place.placeId || ''}`);
+        const response = await fetch(`/api/place-details?placeId=${place.placeId}`);
         if (response.ok) {
           const data = await response.json();
           setDetails(data);
         } else {
-          // Fallback to basic info if API fails
+          const errorText = await response.text();
+          console.error('API error:', errorText);
           setDetails({
             photos: [],
             reviews: [],
@@ -41,6 +58,7 @@ export default function PlaceDetails({ place, onClose }: Props) {
           });
         }
       } catch (error) {
+        console.error('Fetch error:', error);
         setDetails({
           photos: [],
           reviews: [],
