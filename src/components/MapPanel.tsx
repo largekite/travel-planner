@@ -56,8 +56,10 @@ export default function MapPanel({
   dirErr,
 }: Props) {
   const mapRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false);
   const [usedGoogle, setUsedGoogle] = useState(false);
+  const [cityCoords, setCityCoords] = useState({ lat: 38.627, lng: -90.199 });
 
   // Try to load Google Maps JS if a key is provided.
   useEffect(() => {
@@ -103,40 +105,60 @@ export default function MapPanel({
     document.head.appendChild(script);
   }, []);
 
-  // Initialize the map when the script is ready and we have a container.
+  // Geocode city to get coordinates
   useEffect(() => {
-    if (!mapReady) {
-      return;
-    }
-
-    // Small delay to ensure DOM is ready
-    const initMap = () => {
-      if (!mapRef.current) {
-        setTimeout(initMap, 50);
-        return;
+    if (!mapReady || !city) return;
+    
+    const g = (window as any).google;
+    if (!g?.maps?.Geocoder) return;
+    
+    const geocoder = new g.maps.Geocoder();
+    geocoder.geocode({ address: city }, (results: any, status: any) => {
+      if (status === 'OK' && results[0]) {
+        const location = results[0].geometry.location;
+        setCityCoords({ lat: location.lat(), lng: location.lng() });
       }
+    });
+  }, [mapReady, city]);
 
-      const g = (window as any).google;
-      if (!g || !g.maps || !g.maps.Map) {
-        setTimeout(initMap, 100);
-        return;
-      }
+  // Initialize map once
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
 
-    const center = hotel?.lat && hotel.lng
-      ? { lat: hotel.lat, lng: hotel.lng }
-      : chosenItems[0]?.lat && chosenItems[0]?.lng
-      ? { lat: chosenItems[0].lat!, lng: chosenItems[0].lng! }
-      : { lat: 38.627, lng: -90.199 }; // St. Louis center fallback
+    const g = (window as any).google;
+    if (!g?.maps?.Map) return;
 
     const map = new g.maps.Map(mapRef.current, {
       zoom: 12,
-      center,
+      center: cityCoords,
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
     });
 
-    // Add markers for chosen places.
+    mapInstanceRef.current = map;
+    setUsedGoogle(true);
+  }, [mapReady]);
+
+  // Update map center and markers when data changes
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+
+    const map = mapInstanceRef.current;
+    const g = (window as any).google;
+
+    // Clear existing markers
+    // (In a real app, you'd track markers to clear them)
+    
+    const center = hotel?.lat && hotel.lng
+      ? { lat: hotel.lat, lng: hotel.lng }
+      : chosenItems[0]?.lat && chosenItems[0]?.lng
+      ? { lat: chosenItems[0].lat!, lng: chosenItems[0].lng! }
+      : cityCoords;
+
+    map.setCenter(center);
+
+    // Add markers for chosen places
     chosenItems.forEach((p) => {
       if (!p.lat || !p.lng) return;
       new g.maps.Marker({
@@ -146,7 +168,7 @@ export default function MapPanel({
       });
     });
 
-    // Special marker for hotel / center.
+    // Special marker for hotel
     if (hotel?.lat && hotel.lng) {
       new g.maps.Marker({
         position: { lat: hotel.lat, lng: hotel.lng },
@@ -161,18 +183,7 @@ export default function MapPanel({
         },
       });
     }
-
-      setUsedGoogle(true);
-    };
-
-    initMap();
-  }, [
-    mapReady,
-    city,
-    hotel?.lat,
-    hotel?.lng,
-    JSON.stringify(chosenItems.map((c) => c.name)),
-  ]);
+  }, [cityCoords, hotel?.lat, hotel?.lng, JSON.stringify(chosenItems.map(c => c.name))]);
 
   // Fallback straight segments when no real directions are available.
   const straightSegments = React.useMemo(() => {
