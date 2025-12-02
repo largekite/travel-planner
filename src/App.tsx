@@ -344,7 +344,7 @@ useEffect(() => {
     if (!API_BASE) return;
     
     setLoadingProgress(0);
-    const slots = ['breakfast', 'activity', 'lunch', 'coffee', 'dinner'];
+    const slots = ['hotel', 'breakfast', 'activity', 'lunch', 'coffee', 'dinner'];
     
     try {
       // Fetch more options to avoid duplicates
@@ -371,7 +371,8 @@ useEffect(() => {
             area: availableItem.area,
             lat: availableItem.lat,
             lng: availableItem.lng,
-            desc: availableItem.desc
+            desc: availableItem.desc,
+            placeId: availableItem.placeId
           };
         }
       });

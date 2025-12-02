@@ -11,6 +11,7 @@ export type SelectedItem = {
   lng?: number;
   desc?: string;
   meta?: string;
+  placeId?: string;
 };
 
 export type DayPlan = {

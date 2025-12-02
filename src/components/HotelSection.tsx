@@ -104,7 +104,7 @@ export default function HotelSection({
     <div className="rounded-2xl bg-white border p-4">
       <div className="font-semibold mb-2 flex items-center gap-2">
         <Hotel className="w-4 h-4" />
-        Hotel / Area
+        Trip Location
       </div>
       <div className="flex flex-wrap items-center gap-3 mb-3">
         <div className="flex items-center gap-2 border rounded-lg px-2 py-1 w-[320px] bg-white">
@@ -125,7 +125,7 @@ export default function HotelSection({
                 searchHotels(query);
               }
             }}
-            placeholder="e.g., Marriott, Central West End"
+            placeholder="e.g., Chicago, San Francisco, New York"
             className="outline-none w-full text-sm"
           />
         </div>

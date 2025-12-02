@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
-import { GripVertical, X } from 'lucide-react';
+import { GripVertical, X, Eye } from 'lucide-react';
 import { DayPlan, SelectedItem } from '../lib/types';
+import PlaceDetails from './PlaceDetails';
 
 type Props = {
   currentDay: number;
@@ -23,6 +24,7 @@ if (typeof window !== 'undefined') {
 
 export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot }: Props) {
   const currentDayData = plan[currentDay - 1] || {};
+  const [selectedPlace, setSelectedPlace] = useState<SelectedItem | null>(null);
   
   const items = SLOT_ORDER.map(slot => ({
     id: slot,
@@ -93,12 +95,23 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
                         )}
                       </div>
 
-                      <button
-                        onClick={() => removeItem(item.slot)}
-                        className="p-1 text-slate-400 hover:text-red-500 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      <div className="flex gap-1">
+                        {item.item?.placeId && (
+                          <button
+                            onClick={() => setSelectedPlace(item.item!)}
+                            className="p-1 text-slate-400 hover:text-blue-500 transition-colors"
+                            title="View details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeItem(item.slot)}
+                          className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   )}
                 </Draggable>
@@ -119,6 +132,13 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
           )}
         </Droppable>
       </DragDropContext>
+      
+      {selectedPlace && (
+        <PlaceDetails
+          place={selectedPlace}
+          onClose={() => setSelectedPlace(null)}
+        />
+      )}
     </div>
   );
 }
