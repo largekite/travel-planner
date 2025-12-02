@@ -174,6 +174,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       lat: loc?.lat,
       lng: loc?.lng,
       meta: useNearby ? `within ~${maxMins} min ${mode}` : undefined,
+      placeId: p.place_id,
       ratings: {
         google: p.rating,
         googleReviews: p.user_ratings_total,

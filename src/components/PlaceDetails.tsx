@@ -24,25 +24,36 @@ export default function PlaceDetails({ place, onClose }: Props) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate API call for place details
-    const timer = setTimeout(() => {
-      setDetails({
-        photos: [
-          `https://picsum.photos/400/300?random=${Math.floor(Math.random() * 1000)}`,
-          `https://picsum.photos/400/300?random=${Math.floor(Math.random() * 1000)}`
-        ],
-        reviews: [
-          { author: "John D.", rating: 4.5, text: "Great atmosphere and service!" },
-          { author: "Sarah M.", rating: 5, text: "Perfect for a romantic dinner." }
-        ],
-        hours: ["Mon-Thu: 11am-10pm", "Fri-Sat: 11am-11pm", "Sun: 12pm-9pm"],
-        phone: "(314) 555-0123",
-        website: "https://example.com"
-      });
-      setLoading(false);
-    }, 500);
+    async function fetchPlaceDetails() {
+      try {
+        const response = await fetch(`/api/place-details?placeId=${place.placeId || ''}`);
+        if (response.ok) {
+          const data = await response.json();
+          setDetails(data);
+        } else {
+          // Fallback to basic info if API fails
+          setDetails({
+            photos: [],
+            reviews: [],
+            hours: [],
+            phone: undefined,
+            website: place.url
+          });
+        }
+      } catch (error) {
+        setDetails({
+          photos: [],
+          reviews: [],
+          hours: [],
+          phone: undefined,
+          website: place.url
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
 
-    return () => clearTimeout(timer);
+    fetchPlaceDetails();
   }, [place]);
 
   return (
