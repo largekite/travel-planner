@@ -133,13 +133,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     })() : Promise.resolve({});
 
-  // Process places immediately while AI runs in background
-  const processedItems = places.map((p) => {
+  // Process places and fetch details for websites
+  const processedItems = await Promise.all(places.slice(0, 5).map(async (p) => {
     const loc = p.geometry?.location;
     const name = p.name as string;
-    const mapsUrl = p.place_id
+    
+    // Try to get website from Place Details API
+    let websiteUrl = undefined;
+    if (p.place_id) {
+      try {
+        const detailsUrl = new URL("https://maps.googleapis.com/maps/api/place/details/json");
+        detailsUrl.searchParams.set("place_id", p.place_id);
+        detailsUrl.searchParams.set("fields", "website");
+        detailsUrl.searchParams.set("key", googleKey);
+        
+        const detailsRes = await fetch(detailsUrl.toString());
+        const detailsData = await detailsRes.json();
+        websiteUrl = detailsData.result?.website;
+      } catch {
+        // Ignore errors, fall back to Google Maps link
+      }
+    }
+    
+    const finalUrl = websiteUrl || (p.place_id
       ? `https://www.google.com/maps/place/?q=place_id:${p.place_id}`
-      : undefined;
+      : undefined);
 
     let cuisine: string | undefined;
     if (slot === "breakfast") cuisine = "Breakfast";
@@ -149,7 +167,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return {
       name,
-      url: mapsUrl,
+      url: finalUrl,
       area: p.vicinity || p.formatted_address,
       cuisine,
       price: p.price_level != null ? "$".repeat(p.price_level) : undefined,
@@ -161,7 +179,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         googleReviews: p.user_ratings_total,
       },
     };
-  });
+  }));
 
   // Wait for AI descriptions (with timeout)
   try {
