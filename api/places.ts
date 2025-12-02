@@ -134,7 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })() : Promise.resolve({});
 
   // Process places and fetch details for websites
-  const processedItems = await Promise.all(places.slice(0, 5).map(async (p) => {
+  const processedItems = await Promise.all(places.map(async (p) => {
     const loc = p.geometry?.location;
     const name = p.name as string;
     
