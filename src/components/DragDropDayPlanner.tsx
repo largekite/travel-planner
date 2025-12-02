@@ -10,7 +10,7 @@ type Props = {
   openSlot: (slot: string) => void;
 };
 
-const SLOT_ORDER = ['breakfast', 'activity', 'lunch', 'coffee', 'dinner'] as const;
+const SLOT_ORDER = ['hotel', 'breakfast', 'activity', 'lunch', 'coffee', 'dinner'] as const;
 
 // Suppress react-beautiful-dnd deprecation warnings
 if (typeof window !== 'undefined') {

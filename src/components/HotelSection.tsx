@@ -115,13 +115,9 @@ export default function HotelSection({
               const value = e.target.value;
               setQuery(value);
               
-              // Fetch location suggestions
+              // Only fetch location suggestions, don't auto-search hotels
               const suggestions = await fetchLocationSuggestions(value);
               setSuggestions(suggestions);
-              
-              if (searchTimeout) clearTimeout(searchTimeout);
-              const timeout = setTimeout(() => searchHotels(value), 300);
-              setSearchTimeout(timeout);
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
