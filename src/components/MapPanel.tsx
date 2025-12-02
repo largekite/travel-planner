@@ -40,6 +40,7 @@ function etaMins(mode: "walk" | "drive", km: number) {
 
 type Props = {
   currentDay: number;
+  city: string;
   hotel: SelectedItem | null;
   chosenItems: SelectedItem[];
   dirSegs: DirectionsSegment[] | null;
@@ -48,6 +49,7 @@ type Props = {
 
 export default function MapPanel({
   currentDay,
+  city,
   hotel,
   chosenItems,
   dirSegs,
@@ -166,6 +168,7 @@ export default function MapPanel({
     initMap();
   }, [
     mapReady,
+    city,
     hotel?.lat,
     hotel?.lng,
     JSON.stringify(chosenItems.map((c) => c.name)),

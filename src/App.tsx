@@ -604,6 +604,7 @@ useEffect(() => {
 
           <MapPanel
             currentDay={currentDay}
+            city={city}
             hotel={hotel}
             chosenItems={chosenItems}
             dirSegs={dirSegs}
