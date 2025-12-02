@@ -467,6 +467,7 @@ useEffect(() => {
           city={city}
           hotel={hotel}
           setHotel={setHotel}
+          setCity={setCity}
           apiBase={API_BASE}
         />
         
@@ -591,6 +592,7 @@ useEffect(() => {
 
           <MapPanel
             currentDay={currentDay}
+            city={city}
             hotel={hotel}
             chosenItems={chosenItems}
             dirSegs={dirSegs}

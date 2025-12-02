@@ -7,6 +7,7 @@ type Props = {
   city: string;
   hotel: SelectedItem | null;
   setHotel: (h: SelectedItem | null) => void;
+  setCity: (city: string) => void;
   apiBase: string;
 };
 
@@ -14,6 +15,7 @@ export default function HotelSection({
   city,
   hotel,
   setHotel,
+  setCity,
   apiBase,
 }: Props) {
   const [query, setQuery] = useState("");
@@ -21,7 +23,10 @@ export default function HotelSection({
   const [results, setResults] = useState<SelectedItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+<<<<<<< HEAD
 
+=======
+>>>>>>> UI-enhancement
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
   async function fetchLocationSuggestions(query: string) {
@@ -151,6 +156,10 @@ export default function HotelSection({
               onClick={() => {
                 setQuery(suggestion);
                 setSuggestions([]);
+<<<<<<< HEAD
+=======
+                setCity(suggestion);
+>>>>>>> UI-enhancement
                 searchHotels(suggestion);
               }}
               className="block w-full text-left py-1 px-2 hover:bg-blue-100 rounded text-sm"
