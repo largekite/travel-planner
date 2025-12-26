@@ -54,13 +54,13 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
               city,
               vibe,
               slot,
-              limit: '3'
+              limit: '5' // Get more options for variety
             });
             
             const result = await fetchAllPlaces(API_BASE, params, 1);
             if (result.items.length > 0) {
-              // Use different items for variety across days
-              const index = (day - 1) % result.items.length;
+              // Use different items for variety across days and slots
+              const index = ((day - 1) * 6 + slots.indexOf(slot)) % result.items.length;
               dayData[slot] = result.items[index];
             }
           } catch (err) {
@@ -239,7 +239,8 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
           </div>
         </div>
 
-        <div className="overflow-y-auto max-h-[75vh] p-4">
+        <div className="overflow-y-auto" style={{maxHeight: 'calc(95vh - 180px)'}}>
+          <div className="p-4">
           {loading ? (
             <div className="text-center py-8">Generating your perfect itinerary with real places...</div>
           ) : error ? (
@@ -267,6 +268,7 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
               ))}
             </div>
           )}
+          </div>
         </div>
 
         <div className="p-4 border-t bg-slate-50 flex gap-3">
