@@ -220,7 +220,7 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-[min(800px,95vw)] max-h-[90vh] overflow-hidden">
+      <div className="relative bg-white rounded-2xl shadow-xl w-[min(900px,95vw)] max-h-[95vh] overflow-hidden">
         <div className="p-4 border-b">
           <div className="flex justify-between items-start">
             <div>
@@ -239,7 +239,7 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
           </div>
         </div>
 
-        <div className="overflow-y-auto max-h-[70vh] p-4">
+        <div className="overflow-y-auto max-h-[75vh] p-4">
           {loading ? (
             <div className="text-center py-8">Generating your perfect itinerary with real places...</div>
           ) : error ? (

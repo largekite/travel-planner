@@ -75,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return url.toString();
     } else {
       const url = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
-      const queryParts = [googleType, vibe, locationHint].filter(Boolean);
+      const queryParts = [slot, googleType, vibe, locationHint].filter(Boolean);
       url.searchParams.set("query", queryParts.join(" "));
       url.searchParams.set("key", googleKey);
       if (pageToken) url.searchParams.set("pagetoken", pageToken);
