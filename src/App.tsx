@@ -32,6 +32,7 @@ import Tooltip from "./components/Tooltip";
 import { useHistory } from "./hooks/useHistory";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useOnline } from "./hooks/useOnline";
+import SampleItinerary from "./components/SampleItinerary";
 
 // slots in the order they show up on the map
 const SLOT_SEQUENCE: (keyof DayPlan)[] = [
@@ -79,6 +80,7 @@ export default function App() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
+  const [showSampleItinerary, setShowSampleItinerary] = useState(false);
   
   // Online status
   const isOnline = useOnline();
@@ -572,6 +574,15 @@ useEffect(() => {
               <div className="flex gap-2 flex-wrap">
 
                 
+                <Tooltip content="Generate a sample day-to-day itinerary">
+                  <button
+                    onClick={() => setShowSampleItinerary(true)}
+                    className="px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50 text-sm"
+                  >
+                    Sample Itinerary
+                  </button>
+                </Tooltip>
+                
                 <Tooltip content="Automatically fill day with popular places">
                   <button
                     onClick={handleAutoFill}
@@ -698,6 +709,20 @@ useEffect(() => {
           onPrint={handlePrint}
           onHelp={() => setShowHelp(true)}
         />
+        
+        {/* Sample Itinerary Modal */}
+        {showSampleItinerary && (
+          <SampleItinerary
+            city={city}
+            vibe={vibe}
+            daysCount={daysCount}
+            onClose={() => setShowSampleItinerary(false)}
+            onApplyPlan={(newPlan) => {
+              setPlan(newPlan);
+              setShowSampleItinerary(false);
+            }}
+          />
+        )}
         
         {/* Help Modal */}
         {showHelp && (
