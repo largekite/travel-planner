@@ -341,12 +341,19 @@ export default function MapPanel({
           <div>No places selected yet.</div>
         ) : (
           <ul className="list-disc pl-5">
-            {chosenItems.map((p, i) => (
-              <li key={i}>
-                {p.name}{" "}
-                {p.area ? <span className="text-slate-500">· {p.area}</span> : null}
-              </li>
-            ))}
+            {(() => {
+              const seen = new Set<string>();
+              return chosenItems.map((p, i) => {
+                if (!p || !p.name || seen.has(p.name)) return null;
+                seen.add(p.name);
+                return (
+                  <li key={i}>
+                    {p.name}{" "}
+                    {p.area ? <span className="text-slate-500">· {p.area}</span> : null}
+                  </li>
+                );
+              }).filter(Boolean);
+            })()}
           </ul>
         )}
       </div>
