@@ -67,15 +67,55 @@ export default function App() {
   const [city, setCity] = useState(() => 
     localStorage.getItem('travel-city') || "St. Louis"
   );
-  const [vibe, setVibe] = useState<Vibe>("popular");
-  const [daysCount, setDaysCount] = useState(3);
+  const [vibe, setVibe] = useState<Vibe>(() => {
+    const saved = localStorage.getItem('saved-plan');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.vibe || "popular";
+      } catch {}
+    }
+    return "popular";
+  });
+  const [daysCount, setDaysCount] = useState(() => {
+    const saved = localStorage.getItem('saved-plan');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.daysCount || 3;
+      } catch {}
+    }
+    return 3;
+  });
   const [currentDay, setCurrentDay] = useState(1);
   
-  const planHistory = useHistory<DayPlan[]>(
-    Array.from({ length: 3 }, () => ({}))
-  );
+  // Load saved plan from localStorage
+  const getInitialPlan = (): DayPlan[] => {
+    const saved = localStorage.getItem('saved-plan');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.plan || Array.from({ length: 3 }, () => ({}));
+      } catch {}
+    }
+    return Array.from({ length: 3 }, () => ({}));
+  };
+  
+  const planHistory = useHistory<DayPlan[]>(getInitialPlan());
   const plan = planHistory.currentState;
   const setPlan = planHistory.pushState;
+  
+  // hotel / center
+  const [hotel, setHotel] = useState<SelectedItem | null>(() => {
+    const saved = localStorage.getItem('saved-plan');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.hotel || null;
+      } catch {}
+    }
+    return null;
+  });
   
   // UI state
   const [showSmartDefaults, setShowSmartDefaults] = useState(!city || city === "St. Louis");
@@ -87,9 +127,6 @@ export default function App() {
   // Online status
   const isOnline = useOnline();
 
-  // hotel / center
-  const [hotel, setHotel] = useState<SelectedItem | null>(null);
-  
   // route optimization
   const [showOptimization, setShowOptimization] = useState(false);
 
