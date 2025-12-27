@@ -54,10 +54,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const vibeGuide = vibeInstructions[vibe as keyof typeof vibeInstructions] || vibeInstructions.popular;
 
-      const prompt = `You are a travel planner writing a day plan note for Day ${day} in ${city}.
-${vibeGuide}
-Based on these selections: ${summary}
-Write a short, engaging day-plan note that ties the activities together and creates excitement for the day. Keep it 3-5 sentences. Be specific and reference the places/activities selected.`;
+      const prompt = `You are a travel planner writing a very concise day-plan note for Day ${day} in ${city}.
+    ${vibeGuide}
+    Based on these selections: ${summary}
+    Write a short 1-2 sentence summary (one short sentence preferred) that highlights the day's plan and key places. Use plain, direct language, reference the selected spots briefly, and avoid lists, headers, or extra commentary. Keep it under ~35 words.`;
 
       try {
         const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -69,7 +69,8 @@ Write a short, engaging day-plan note that ties the activities together and crea
           body: JSON.stringify({
             model: "gpt-4o-mini",
             messages: [{ role: "user", content: prompt }],
-            temperature: 0.9,
+            temperature: 0.6,
+            max_tokens: 120
           }),
         }).then((r) => r.json());
 
