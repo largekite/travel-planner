@@ -244,18 +244,22 @@ export default function App() {
     if (API_BASE) {
       const dayIdx = currentDay;
       const snapshot = cloneDay({ ...currentDayData, [slotKey]: sel });
+      console.log('[chooseForSlot] Fetching notes, hotel should still be:', sel.name);
       fetchDayNotes(API_BASE, dayIdx, city, vibe, snapshot)
         .then((notes) => {
           if (!notes) return;
+          console.log('[chooseForSlot] Received notes, setting plan notes. Hotel should still be:', sel.name);
           const next = plan.map((d: DayPlan) => ({ ...d }));
           next[dayIdx - 1].notes = notes;
           setPlan(next);
         })
         .catch(() => {
           // ignore notes error, UI still works
+          console.log('[chooseForSlot] Notes fetch failed, but hotel should still be:', sel.name);
         });
     }
 
+    console.log('[chooseForSlot] Closing modal, hotel should be:', sel.name);
     setSlotModalOpen(false);
   }
 
@@ -268,6 +272,8 @@ useEffect(() => {
     setLiveError("API base not configured");
     return;
   }
+
+  console.log('[suggestions-effect] Running, current hotel:', hotel?.name);
 
   const ctrl = new AbortController();
   setLiveLoading(true);
