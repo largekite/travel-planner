@@ -436,10 +436,19 @@ useEffect(() => {
       const usedNames = new Set<string>();
       
       results.forEach(({ slot, items }) => {
-        // Find first item that hasn't been used
-        const availableItem = items.find(item => !usedNames.has(item.name));
+        // Allow activities to be duplicated, but avoid duplicates within meals
+        const isMealSlot = ['breakfast', 'lunch', 'coffee', 'dinner'].includes(slot);
+        
+        // Find first item that hasn't been used (only check for meal slots)
+        const availableItem = isMealSlot 
+          ? items.find(item => !usedNames.has(item.name))
+          : items[0]; // For activities, just take first item
+          
         if (availableItem) {
-          usedNames.add(availableItem.name);
+          // Only add to usedNames if it's a meal slot
+          if (isMealSlot) {
+            usedNames.add(availableItem.name);
+          }
           (newPlan[currentDay - 1] as any)[slot] = {
             name: availableItem.name,
             url: availableItem.url,
