@@ -17,6 +17,7 @@ export type SelectedItem = {
 export type DayPlan = {
   hotel?: SelectedItem;
   activity?: SelectedItem;
+  activity2?: SelectedItem;
   breakfast?: SelectedItem;
   lunch?: SelectedItem;
   dinner?: SelectedItem;
@@ -26,7 +27,7 @@ export type DayPlan = {
 
 export type SlotKey = keyof Pick<
   DayPlan,
-  "hotel" | "activity" | "breakfast" | "lunch" | "dinner" | "coffee"
+  "hotel" | "activity" | "activity2" | "breakfast" | "lunch" | "dinner" | "coffee"
 >;
 
 export type ApiSuggestion = {

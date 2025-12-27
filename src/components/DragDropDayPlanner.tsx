@@ -15,7 +15,8 @@ const SLOT_ORDER = [
   { key: 'breakfast', label: 'Breakfast', time: '8:00 AM' },
   { key: 'activity', label: 'Morning Activity', time: '10:00 AM' },
   { key: 'lunch', label: 'Lunch', time: '12:30 PM' },
-  { key: 'coffee', label: 'Afternoon Coffee', time: '3:00 PM' },
+  { key: 'activity2', label: 'Afternoon Activity', time: '2:30 PM' },
+  { key: 'coffee', label: 'Coffee Break', time: '4:00 PM' },
   { key: 'dinner', label: 'Dinner', time: '7:00 PM' }
 ] as const;
 

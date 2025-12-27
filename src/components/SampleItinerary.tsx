@@ -139,6 +139,15 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
         desc: day.activity.desc,
         placeId: day.activity.placeId
       } : undefined,
+      activity2: day.activity2 ? {
+        name: day.activity2.name,
+        url: day.activity2.url,
+        area: day.activity2.area,
+        lat: day.activity2.lat,
+        lng: day.activity2.lng,
+        desc: day.activity2.desc,
+        placeId: day.activity2.placeId
+      } : undefined,
       lunch: day.lunch ? {
         name: day.lunch.name,
         url: day.lunch.url,

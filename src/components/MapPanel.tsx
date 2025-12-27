@@ -131,10 +131,22 @@ export default function MapPanel({
     const map = new g.maps.Map(mapRef.current, {
       zoom: 12,
       center: cityCoords,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
+      mapTypeControl: true,
+      streetViewControl: true,
+      fullscreenControl: true,
+      zoomControl: true,
+      mapTypeControlOptions: {
+        style: g.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+        position: g.maps.ControlPosition.TOP_CENTER,
+      },
+      fullscreenControlOptions: {
+        position: g.maps.ControlPosition.RIGHT_TOP,
+      },
     });
+
+    // Add traffic layer
+    const trafficLayer = new g.maps.TrafficLayer();
+    trafficLayer.setMap(map);
 
     mapInstanceRef.current = map;
     setUsedGoogle(true);
@@ -218,7 +230,7 @@ export default function MapPanel({
         </div>
       </div>
 
-      <div ref={mapRef} className="w-full h-[320px] rounded-xl border" style={{ display: usedGoogle ? 'block' : 'none' }} />
+      <div ref={mapRef} className="w-full h-[400px] rounded-xl border" style={{ display: usedGoogle ? 'block' : 'none' }} />
       {!usedGoogle && (
         <svg
           viewBox="0 0 100 100"
