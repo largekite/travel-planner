@@ -17,6 +17,7 @@ type SampleDay = {
   breakfast?: ApiSuggestion;
   activity?: ApiSuggestion;
   lunch?: ApiSuggestion;
+  activity2?: ApiSuggestion;
   coffee?: ApiSuggestion;
   dinner?: ApiSuggestion;
   notes: string;
@@ -38,7 +39,7 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
     setError(null);
     
     try {
-      const slots = ['hotel', 'breakfast', 'activity', 'lunch', 'coffee', 'dinner'] as const;
+      const slots = ['hotel', 'breakfast', 'activity', 'lunch', 'activity2', 'coffee', 'dinner'] as const;
       const plan: SampleDay[] = [];
       
       for (let day = 1; day <= daysCount; day++) {
@@ -53,7 +54,7 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
             const params = new URLSearchParams({
               city,
               vibe,
-              slot,
+              slot: slot === 'activity2' ? 'activity' : slot, // Use 'activity' for both activity slots
               limit: '5' // Get more options for variety
             });
             
@@ -178,7 +179,7 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
   };
 
   const exportToCSV = () => {
-    const headers = ['Day', 'Hotel', 'Breakfast', 'Activity', 'Lunch', 'Coffee', 'Dinner', 'Notes'];
+    const headers = ['Day', 'Hotel', 'Breakfast', 'Morning Activity', 'Lunch', 'Afternoon Activity', 'Coffee', 'Dinner', 'Notes'];
     const csvContent = [
       headers.join(','),
       ...samplePlan.map(day => [
@@ -187,6 +188,7 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
         `"${day.breakfast?.name || 'TBD'}"`,
         `"${day.activity?.name || 'TBD'}"`,
         `"${day.lunch?.name || 'TBD'}"`,
+        `"${day.activity2?.name || 'TBD'}"`,
         `"${day.coffee?.name || 'TBD'}"`,
         `"${day.dinner?.name || 'TBD'}"`,
         `"${day.notes}"`
@@ -204,7 +206,7 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
 
   const shareItinerary = async () => {
     const text = samplePlan.map(day => 
-      `Day ${day.day}:\n🏨 ${day.hotel?.name || 'TBD'}\n🍳 ${day.breakfast?.name || 'TBD'}\n🎯 ${day.activity?.name || 'TBD'}\n🍽️ ${day.lunch?.name || 'TBD'}\n☕ ${day.coffee?.name || 'TBD'}\n🍷 ${day.dinner?.name || 'TBD'}\n📝 ${day.notes}\n`
+      `Day ${day.day}:\n🏨 ${day.hotel?.name || 'TBD'}\n🍳 ${day.breakfast?.name || 'TBD'}\n🎯 ${day.activity?.name || 'TBD'}\n🍽️ ${day.lunch?.name || 'TBD'}\n🎨 ${day.activity2?.name || 'TBD'}\n☕ ${day.coffee?.name || 'TBD'}\n🍷 ${day.dinner?.name || 'TBD'}\n📝 ${day.notes}\n`
     ).join('\n');
 
     if (navigator.share) {
@@ -261,8 +263,9 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                     <div><strong>🏨 Hotel:</strong> {day.hotel?.name || 'TBD'}</div>
                     <div><strong>🍳 Breakfast:</strong> {day.breakfast?.name || 'TBD'}</div>
-                    <div><strong>🎯 Activity:</strong> {day.activity?.name || 'TBD'}</div>
+                    <div><strong>🎯 Morning Activity:</strong> {day.activity?.name || 'TBD'}</div>
                     <div><strong>🍽️ Lunch:</strong> {day.lunch?.name || 'TBD'}</div>
+                    <div><strong>🎨 Afternoon Activity:</strong> {day.activity2?.name || 'TBD'}</div>
                     <div><strong>☕ Coffee:</strong> {day.coffee?.name || 'TBD'}</div>
                     <div><strong>🍷 Dinner:</strong> {day.dinner?.name || 'TBD'}</div>
                   </div>

@@ -85,7 +85,7 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
               </button>
             </div>
           </div>
-        ))}}
+        ))}
         
         {/* Add new slot buttons */}
         {SLOT_ORDER.filter(slot => !currentDayData[slot.key as keyof DayPlan]).map(slot => (

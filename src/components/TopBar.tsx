@@ -84,13 +84,24 @@ export default function TopBar({
         <input
           type="number"
           min={1}
-          max={14}
           value={daysCount}
-          onChange={(e) =>
-            setDaysCount(
-              Math.max(1, Math.min(14, parseInt(e.target.value || "1")))
-            )
-          }
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value === '') {
+              // Allow empty input temporarily
+              return;
+            }
+            const numValue = parseInt(value);
+            if (numValue >= 1) {
+              setDaysCount(numValue);
+            }
+          }}
+          onBlur={(e) => {
+            // Set to 1 if empty when losing focus
+            if (e.target.value === '') {
+              setDaysCount(1);
+            }
+          }}
           className="w-20 border rounded-lg p-1 bg-white"
         />
       </div>
