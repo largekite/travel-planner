@@ -708,6 +708,7 @@ useEffect(() => {
               <thead>
                 <tr className="text-left text-slate-500">
                   <th className="py-2 pr-4">Day</th>
+                  <th className="py-2 pr-4">Hotel</th>
                     <th className="py-2 pr-4">Breakfast</th>
                     <th className="py-2 pr-4">Morning Activity</th>
                     <th className="py-2 pr-4">Afternoon Activity</th>
@@ -721,6 +722,9 @@ useEffect(() => {
                 {plan.map((d, i) => (
                   <tr key={i} className="border-t align-top">
                     <td className="py-2 pr-4 font-medium">Day {i + 1}</td>
+                    <td className="py-2 pr-4">
+                      {d.hotel?.name || <span className="text-slate-400">—</span>}
+                    </td>
                       <td className="py-2 pr-4">
                         {d.breakfast?.name || <span className="text-slate-400">—</span>}
                       </td>
