@@ -188,6 +188,7 @@ export default function App() {
 
   // directions fetch
   useEffect(() => {
+    console.log('[directions effect] Running, current hotel:', hotel?.name, 'chosenItems count:', chosenItems.length);
     if (!API_BASE) return;
     if (chosenItems.length < 2) {
       setDirSegs(null);
@@ -440,6 +441,7 @@ useEffect(() => {
   
   // Auto-save
   useEffect(() => {
+    console.log('[auto-save effect] Saving, current hotel:', hotel?.name);
     const timer = setTimeout(handleSave, 2000);
     return () => clearTimeout(timer);
   }, [plan, city, vibe, hotel]);
