@@ -244,21 +244,23 @@ export default function App() {
     if (API_BASE) {
       const dayIdx = currentDay;
       const snapshot = cloneDay({ ...currentDayData, [slotKey]: sel });
-
+      // Capture the selected item value to preserve it when notes arrive
+      const selectedItemValue = sel;
+      const capturedSlotKey = slotKey;
+      
       fetchDayNotes(API_BASE, dayIdx, city, vibe, snapshot)
         .then((notes) => {
           if (!notes) return;
 
-          // Use previous state to avoid closure issues
-          setPlan((prevPlan) => {
-            const next = prevPlan.map((d: DayPlan) => ({ ...d }));
-            next[dayIdx - 1].notes = notes;
-            return next;
-          });
+          // Update plan while preserving the selected slot item
+          const updated = plan.map((d: DayPlan) => ({ ...d }));
+          // Restore the selected item in case plan changed
+          (updated[dayIdx - 1] as any)[capturedSlotKey] = selectedItemValue;
+          updated[dayIdx - 1].notes = notes;
+          setPlan(updated);
         })
         .catch(() => {
           // ignore notes error, UI still works
-
         });
     }
 
@@ -403,8 +405,7 @@ useEffect(() => {
             area: availableItem.area,
             lat: availableItem.lat,
             lng: availableItem.lng,
-            desc: availableItem.desc,
-            placeId: availableItem.placeId
+            desc: availableItem.desc
           };
         }
       });
