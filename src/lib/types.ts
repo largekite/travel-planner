@@ -1,4 +1,4 @@
-export const VIBES = ["romantic", "family", "adventurous"] as const;
+export const VIBES = ["popular", "romantic", "family", "adventurous"] as const;
 export type Vibe = (typeof VIBES)[number];
 
 export type SelectedItem = {

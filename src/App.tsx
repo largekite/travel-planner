@@ -65,7 +65,7 @@ export default function App() {
   const [city, setCity] = useState(() => 
     localStorage.getItem('travel-city') || "St. Louis"
   );
-  const [vibe, setVibe] = useState<Vibe>("romantic");
+  const [vibe, setVibe] = useState<Vibe>("popular");
   const [daysCount, setDaysCount] = useState(3);
   const [currentDay, setCurrentDay] = useState(1);
   

@@ -61,8 +61,15 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
               <span className="text-xs font-medium">{item.time}</span>
             </div>
             
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-sm">{item.label}</div>
+            <div 
+              className="flex-1 min-w-0 cursor-pointer hover:bg-slate-50 p-2 rounded transition-colors"
+              onClick={() => item.item?.placeId && setSelectedPlace(item.item!)}
+              title={item.item?.placeId ? "Click to view details" : undefined}
+            >
+              <div className="font-medium text-sm flex items-center gap-2">
+                {item.label}
+                {item.item?.placeId && <Eye className="w-3 h-3 text-slate-400" />}
+              </div>
               <div className="text-sm text-slate-600 truncate">{item.item?.name}</div>
               {item.item?.area && (
                 <div className="text-xs text-slate-500">{item.item.area}</div>
@@ -70,15 +77,6 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
             </div>
 
             <div className="flex gap-1">
-              {item.item?.placeId && (
-                <button
-                  onClick={() => setSelectedPlace(item.item!)}
-                  className="p-1 text-slate-400 hover:text-blue-500 transition-colors"
-                  title="View details"
-                >
-                  <Eye className="w-4 h-4" />
-                </button>
-              )}
               <button
                 onClick={() => removeItem(item.slot)}
                 className="p-1 text-slate-400 hover:text-red-500 transition-colors"
@@ -87,7 +85,7 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
               </button>
             </div>
           </div>
-        ))}
+        ))}}
         
         {/* Add new slot buttons */}
         {SLOT_ORDER.filter(slot => !currentDayData[slot.key as keyof DayPlan]).map(slot => (

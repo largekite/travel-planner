@@ -81,6 +81,11 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
 
   const getNotesForDay = (day: number, vibe: Vibe, city: string): string => {
     const vibeNotes = {
+      popular: [
+        `Discover the best of ${city} with top-rated attractions and dining`,
+        `Experience ${city}'s most recommended spots and local favorites`,
+        `Enjoy ${city}'s highlights with highly-rated places and activities`
+      ],
       romantic: [
         `Perfect romantic day in ${city} - start slow and enjoy intimate moments`,
         `Focus on scenic spots and cozy atmospheres around ${city}`,
