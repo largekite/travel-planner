@@ -236,6 +236,7 @@ export default function App() {
     // If the user chose a hotel/center, also update the global `hotel` state
     // so maps and other UI that rely on `hotel` will reflect the selection.
     if (slotKey === 'hotel') {
+      console.log('[chooseForSlot] Setting hotel to:', sel.name, 'lat:', sel.lat, 'lng:', sel.lng);
       setHotel(sel);
     }
 
@@ -335,6 +336,7 @@ useEffect(() => {
   function handleClearSaved() {
     const ok = window.confirm('Clear saved trip and reset to defaults? This will remove saved city and plan from your browser.');
     if (!ok) return;
+    console.log('[handleClearSaved] Clearing saved data');
     localStorage.removeItem('saved-plan');
     localStorage.removeItem('travel-city');
     // Reset state
@@ -368,6 +370,7 @@ useEffect(() => {
   const handleAutoFill = async () => {
     if (!API_BASE) return;
     
+    console.log('[handleAutoFill] Starting auto-fill, current hotel:', hotel?.name);
     setLoadingProgress(0);
     const slots = ['hotel', 'breakfast', 'activity', 'lunch', 'coffee', 'dinner'];
     
@@ -418,6 +421,15 @@ useEffect(() => {
     s: handleSave,
     p: handlePrint
   });
+
+  // Debug: log hotel state changes
+  useEffect(() => {
+    if (hotel) {
+      console.log('[App] Hotel state changed to:', hotel.name, 'lat:', hotel.lat, 'lng:', hotel.lng);
+    } else {
+      console.log('[App] Hotel state cleared');
+    }
+  }, [hotel]);
   
   // Auto-save
   useEffect(() => {
