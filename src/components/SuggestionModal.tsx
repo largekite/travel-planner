@@ -406,7 +406,16 @@ function ListView({
       {filteredItems.map((it, idx) => (
         <div
           key={idx}
-          className="py-3 px-3 flex items-start justify-between gap-3 hover:bg-slate-50"
+          className="py-3 px-3 flex items-start justify-between gap-3 hover:bg-slate-50 cursor-pointer"
+          onClick={() => onViewDetails(it)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onViewDetails(it);
+            }
+          }}
         >
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -432,6 +441,7 @@ function ListView({
                   rel="noreferrer"
                   className="text-slate-400 hover:text-slate-700"
                   title="Open link"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <ExternalLink className="w-4 h-4" />
                 </a>
@@ -459,21 +469,21 @@ function ListView({
           </div>
           <div className="flex gap-1">
             <button
-              onClick={() => onViewDetails(it)}
+              onClick={(e) => { e.stopPropagation(); onViewDetails(it); }}
               className="px-2 py-1 rounded border bg-white hover:bg-slate-50 text-xs"
               title="View details"
             >
               <Eye className="w-3 h-3" />
             </button>
             <button
-              onClick={() => onAddToCompare(it)}
+              onClick={(e) => { e.stopPropagation(); onAddToCompare(it); }}
               className="px-2 py-1 rounded border bg-white hover:bg-slate-50 text-xs"
               title="Add to compare"
             >
               <Plus className="w-3 h-3" />
             </button>
             <button
-              onClick={() => onChoose(it)}
+              onClick={(e) => { e.stopPropagation(); onChoose(it); }}
               className="px-3 py-1.5 rounded-lg border bg-indigo-50 hover:bg-indigo-100 text-sm whitespace-nowrap"
               type="button"
             >

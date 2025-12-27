@@ -1,5 +1,5 @@
 import React from 'react';
-import { Undo2, Redo2, Save, Share2, Printer, HelpCircle } from 'lucide-react';
+import { Undo2, Redo2, Save, Share2, Printer, HelpCircle, Trash2 } from 'lucide-react';
 
 type Props = {
   canUndo: boolean;
@@ -10,6 +10,7 @@ type Props = {
   onShare: () => void;
   onPrint: () => void;
   onHelp: () => void;
+  onClearSaved?: () => void;
 };
 
 export default function QuickActionsToolbar({
@@ -21,6 +22,7 @@ export default function QuickActionsToolbar({
   onShare,
   onPrint,
   onHelp
+  ,onClearSaved
 }: Props) {
   return (
     <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-lg border p-2 flex gap-1 z-50">
@@ -69,6 +71,15 @@ export default function QuickActionsToolbar({
       >
         <HelpCircle className="w-4 h-4" />
       </button>
+      {onClearSaved && (
+        <button
+          onClick={onClearSaved}
+          className="p-2 rounded-full hover:bg-slate-100"
+          title="Clear saved data"
+        >
+          <Trash2 className="w-4 h-4 text-rose-600" />
+        </button>
+      )}
     </div>
   );
 }

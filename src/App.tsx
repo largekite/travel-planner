@@ -39,6 +39,7 @@ const SLOT_SEQUENCE: (keyof DayPlan)[] = [
   "hotel",
   "breakfast",
   "activity",
+  "activity2",
   "lunch",
   "coffee",
   "dinner",
@@ -232,6 +233,12 @@ export default function App() {
     (next[idx] as any)[slotKey] = sel;
     setPlan(next);
 
+    // If the user chose a hotel/center, also update the global `hotel` state
+    // so maps and other UI that rely on `hotel` will reflect the selection.
+    if (slotKey === 'hotel') {
+      setHotel(sel);
+    }
+
     // 2) ask backend to generate notes for this day (non-hardcoded)
     if (API_BASE) {
       const dayIdx = currentDay;
@@ -323,6 +330,22 @@ useEffect(() => {
     localStorage.setItem('saved-plan', JSON.stringify(planData));
     localStorage.setItem('travel-city', city);
   };
+
+  // Clear saved data and reset app state to defaults
+  function handleClearSaved() {
+    const ok = window.confirm('Clear saved trip and reset to defaults? This will remove saved city and plan from your browser.');
+    if (!ok) return;
+    localStorage.removeItem('saved-plan');
+    localStorage.removeItem('travel-city');
+    // Reset state
+    setCity('');
+    setVibe('popular');
+    setHotel(null);
+    setDaysCount(3);
+    setPlan(Array.from({ length: 3 }, () => ({} as DayPlan)));
+    setCurrentDay(1);
+    setShowSmartDefaults(true);
+  }
   
   const handleShare = async () => {
     const url = new URL(window.location.href);
@@ -638,9 +661,10 @@ useEffect(() => {
               <thead>
                 <tr className="text-left text-slate-500">
                   <th className="py-2 pr-4">Day</th>
-                  <th className="py-2 pr-4">Breakfast</th>
-                  <th className="py-2 pr-4">Activity</th>
-                  <th className="py-2 pr-4">Lunch</th>
+                    <th className="py-2 pr-4">Breakfast</th>
+                    <th className="py-2 pr-4">Morning Activity</th>
+                    <th className="py-2 pr-4">Afternoon Activity</th>
+                    <th className="py-2 pr-4">Lunch</th>
                   <th className="py-2 pr-4">Coffee</th>
                   <th className="py-2 pr-4">Dinner</th>
                   <th className="py-2 pr-4">Notes</th>
@@ -650,21 +674,24 @@ useEffect(() => {
                 {plan.map((d, i) => (
                   <tr key={i} className="border-t align-top">
                     <td className="py-2 pr-4 font-medium">Day {i + 1}</td>
-                    <td className="py-2 pr-4">
-                      {d.breakfast?.name || <span className="text-slate-400">—</span>}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {d.activity?.name || <span className="text-slate-400">—</span>}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {d.lunch?.name || <span className="text-slate-400">—</span>}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {d.coffee?.name || <span className="text-slate-400">—</span>}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {d.dinner?.name || <span className="text-slate-400">—</span>}
-                    </td>
+                      <td className="py-2 pr-4">
+                        {d.breakfast?.name || <span className="text-slate-400">—</span>}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {d.activity?.name || <span className="text-slate-400">—</span>}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {d.activity2?.name || <span className="text-slate-400">—</span>}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {d.lunch?.name || <span className="text-slate-400">—</span>}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {d.coffee?.name || <span className="text-slate-400">—</span>}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {d.dinner?.name || <span className="text-slate-400">—</span>}
+                      </td>
                     <td className="py-2 pr-4 max-w-[320px] truncate" title={d.notes}>
                       {d.notes || <span className="text-slate-400">—</span>}
                     </td>
@@ -708,6 +735,7 @@ useEffect(() => {
           onShare={handleShare}
           onPrint={handlePrint}
           onHelp={() => setShowHelp(true)}
+          onClearSaved={handleClearSaved}
         />
         
         {/* Sample Itinerary Modal */}
