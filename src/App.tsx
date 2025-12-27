@@ -50,6 +50,7 @@ function cloneDay(d: DayPlan | undefined): DayPlan {
   return {
     hotel: d?.hotel ? { ...d.hotel } : undefined,
     activity: d?.activity ? { ...d.activity } : undefined,
+    activity2: d?.activity2 ? { ...d.activity2 } : undefined,
     breakfast: d?.breakfast ? { ...d.breakfast } : undefined,
     lunch: d?.lunch ? { ...d.lunch } : undefined,
     dinner: d?.dinner ? { ...d.dinner } : undefined,
@@ -188,7 +189,6 @@ export default function App() {
 
   // directions fetch
   useEffect(() => {
-    console.log('[directions effect] Running, current hotel:', hotel?.name, 'chosenItems count:', chosenItems.length);
     if (!API_BASE) return;
     if (chosenItems.length < 2) {
       setDirSegs(null);
@@ -208,7 +208,6 @@ export default function App() {
 
   // open picker
   function openSlot(slot: SlotKey) {
-    console.log('[openSlot] Opening modal for slot:', slot, 'current hotel:', hotel?.name);
     setSlotKey(slot);
     setSlotModalOpen(true);
     // Clear any existing items to force fresh fetch
@@ -238,7 +237,6 @@ export default function App() {
     // If the user chose a hotel/center, also update the global `hotel` state
     // so maps and other UI that rely on `hotel` will reflect the selection.
     if (slotKey === 'hotel') {
-      console.log('[chooseForSlot] Setting hotel to:', sel.name, 'lat:', sel.lat, 'lng:', sel.lng);
       setHotel(sel);
     }
 
@@ -246,22 +244,24 @@ export default function App() {
     if (API_BASE) {
       const dayIdx = currentDay;
       const snapshot = cloneDay({ ...currentDayData, [slotKey]: sel });
-      console.log('[chooseForSlot] Fetching notes, hotel should still be:', sel.name);
+
       fetchDayNotes(API_BASE, dayIdx, city, vibe, snapshot)
         .then((notes) => {
           if (!notes) return;
-          console.log('[chooseForSlot] Received notes, setting plan notes. Hotel should still be:', sel.name);
-          const next = plan.map((d: DayPlan) => ({ ...d }));
-          next[dayIdx - 1].notes = notes;
-          setPlan(next);
+
+          // Use previous state to avoid closure issues
+          setPlan((prevPlan) => {
+            const next = prevPlan.map((d: DayPlan) => ({ ...d }));
+            next[dayIdx - 1].notes = notes;
+            return next;
+          });
         })
         .catch(() => {
           // ignore notes error, UI still works
-          console.log('[chooseForSlot] Notes fetch failed, but hotel should still be:', sel.name);
+
         });
     }
 
-    console.log('[chooseForSlot] Closing modal, hotel should be:', sel.name);
     setSlotModalOpen(false);
   }
 
@@ -274,8 +274,6 @@ useEffect(() => {
     setLiveError("API base not configured");
     return;
   }
-
-  console.log('[suggestions-effect] Running, current hotel:', hotel?.name);
 
   const ctrl = new AbortController();
   setLiveLoading(true);
@@ -344,7 +342,6 @@ useEffect(() => {
   function handleClearSaved() {
     const ok = window.confirm('Clear saved trip and reset to defaults? This will remove saved city and plan from your browser.');
     if (!ok) return;
-    console.log('[handleClearSaved] Clearing saved data');
     localStorage.removeItem('saved-plan');
     localStorage.removeItem('travel-city');
     // Reset state
@@ -378,7 +375,6 @@ useEffect(() => {
   const handleAutoFill = async () => {
     if (!API_BASE) return;
     
-    console.log('[handleAutoFill] Starting auto-fill, current hotel:', hotel?.name);
     setLoadingProgress(0);
     const slots = ['hotel', 'breakfast', 'activity', 'lunch', 'coffee', 'dinner'];
     
@@ -430,18 +426,10 @@ useEffect(() => {
     p: handlePrint
   });
 
-  // Debug: log hotel state changes
-  useEffect(() => {
-    if (hotel) {
-      console.log('[App useEffect] Hotel state changed to:', hotel.name, 'lat:', hotel.lat, 'lng:', hotel.lng);
-    } else {
-      console.log('[App useEffect] Hotel state cleared (is now null)');
-    }
-  }, [hotel]);
+
   
   // Auto-save
   useEffect(() => {
-    console.log('[auto-save effect] Saving, current hotel:', hotel?.name);
     const timer = setTimeout(handleSave, 2000);
     return () => clearTimeout(timer);
   }, [plan, city, vibe, hotel]);
