@@ -730,14 +730,6 @@ useEffect(() => {
                   <div className="mt-3 text-xs text-slate-600 bg-blue-50 border border-blue-200 rounded p-2">
                     <strong>What this does:</strong> Rearranges your day's activities to minimize walking. Your hotel stays the same.
                   </div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="mt-2 text-xs text-slate-500">
-                        Walking: {optimization.totalTime}min, {optimization.totalDistance}km
-                      </div>
-                    </div>
-                  </div>
                   
                   <button
                     onClick={() => {
