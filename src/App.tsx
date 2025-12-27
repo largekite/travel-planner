@@ -21,7 +21,7 @@ import {
   fetchDirections,
   detectApiBase,
 } from "./lib/api";
-import { optimizeRoute } from "./lib/routeOptimizer";
+import { optimizeRoute, calculateRouteTotals } from "./lib/routeOptimizer";
 import LocationButton from "./components/LocationButton";
 import ErrorBoundary from "./components/ErrorBoundary";
 import QuickActionsToolbar from "./components/QuickActionsToolbar";
@@ -675,11 +675,18 @@ useEffect(() => {
                 hotel ? { lat: hotel.lat!, lng: hotel.lng! } : undefined,
                 "walk"
               );
-              
+              // Compute original route totals for a fair comparison
+              const originalTotals = calculateRouteTotals(
+                chosenItems,
+                hotel ? { lat: hotel.lat!, lng: hotel.lng! } : undefined,
+                "walk"
+              );
+              const savedMinutes = Math.max(0, Math.round(originalTotals.totalTime - optimization.totalTime));
+
               return (
                 <div className="space-y-3">
                   <div className="text-sm bg-green-50 border border-green-200 rounded p-3 text-green-800">
-                    💡 Rearranging in this order saves ~{Math.max(0, chosenItems.length * 5 - optimization.totalTime)} minutes of walking
+                    💡 Rearranging in this order saves ~{savedMinutes} minutes of walking — {originalTotals.totalTime}min → {optimization.totalTime}min
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4 text-sm">

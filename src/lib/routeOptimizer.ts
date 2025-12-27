@@ -102,3 +102,34 @@ export function optimizeRoute(
     totalDistance: Math.round(totalDistance * 100) / 100
   };
 }
+
+// Compute totals for a given order of places (distance/time)
+export function calculateRouteTotals(
+  places: SelectedItem[],
+  startPoint?: { lat: number; lng: number },
+  mode: "walk" | "drive" = "walk"
+): { totalTime: number; totalDistance: number } {
+  const validPlaces = places.filter(p => p.lat && p.lng);
+  if (validPlaces.length <= 1) return { totalTime: 0, totalDistance: 0 };
+
+  let totalDistance = 0;
+  let totalTime = 0;
+  let current = startPoint ? { lat: startPoint.lat, lng: startPoint.lng } : { lat: validPlaces[0].lat!, lng: validPlaces[0].lng! };
+  let startIndex = startPoint ? 0 : 1;
+
+  if (!startPoint) {
+    // if no startPoint, we've already set current to first place; start calculating from second
+    totalDistance = 0;
+    totalTime = 0;
+  }
+
+  for (let i = startPoint ? 0 : 1; i < validPlaces.length; i++) {
+    const next = validPlaces[i];
+    const dist = calculateDistance(current.lat, current.lng, next.lat!, next.lng!);
+    totalDistance += dist;
+    totalTime += estimateTime(dist, mode);
+    current = { lat: next.lat!, lng: next.lng! };
+  }
+
+  return { totalTime: Math.round(totalTime), totalDistance: Math.round(totalDistance * 100) / 100 };
+}
