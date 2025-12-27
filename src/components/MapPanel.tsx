@@ -45,6 +45,7 @@ type Props = {
   chosenItems: SelectedItem[];
   dirSegs: DirectionsSegment[] | null;
   dirErr: string | null;
+  onItemClick?: (item: SelectedItem) => void;
 };
 
 export default function MapPanel({
@@ -54,6 +55,7 @@ export default function MapPanel({
   chosenItems,
   dirSegs,
   dirErr,
+  onItemClick,
 }: Props) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -347,7 +349,11 @@ export default function MapPanel({
                 if (!p || !p.name || seen.has(p.name)) return null;
                 seen.add(p.name);
                 return (
-                  <li key={i}>
+                  <li 
+                    key={i}
+                    onClick={() => onItemClick?.(p)}
+                    className="cursor-pointer hover:text-indigo-600 hover:underline"
+                  >
                     {p.name}{" "}
                     {p.area ? <span className="text-slate-500">· {p.area}</span> : null}
                   </li>

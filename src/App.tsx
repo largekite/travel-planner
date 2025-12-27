@@ -24,6 +24,7 @@ import {
 import { optimizeRoute, calculateRouteTotals } from "./lib/routeOptimizer";
 import LocationButton from "./components/LocationButton";
 import ErrorBoundary from "./components/ErrorBoundary";
+import PlaceDetails from "./components/PlaceDetails";
 import QuickActionsToolbar from "./components/QuickActionsToolbar";
 import SmartDefaults from "./components/SmartDefaults";
 import DragDropDayPlanner from "./components/DragDropDayPlanner";
@@ -154,6 +155,10 @@ export default function App() {
   // directions / map
   const [dirSegs, setDirSegs] = useState<DirectionsSegment[] | null>(null);
   const [dirErr, setDirErr] = useState<string | null>(null);
+
+  // detail modal for map items
+  const [detailItem, setDetailItem] = useState<SelectedItem | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   // API status
   const [apiOk, setApiOk] = useState<boolean | null>(null);
@@ -786,6 +791,11 @@ useEffect(() => {
             chosenItems={chosenItems}
             dirSegs={dirSegs}
             dirErr={dirErr}
+            onItemClick={(item) => {
+              // Open details modal for the clicked item
+              setDetailItem(item);
+              setShowDetailModal(true);
+            }}
           />
         </div>
 
@@ -914,6 +924,17 @@ useEffect(() => {
               </button>
             </div>
           </div>
+        )}
+        
+        {/* Place details modal from map click */}
+        {showDetailModal && detailItem && (
+          <PlaceDetails 
+            place={detailItem}
+            onClose={() => {
+              setShowDetailModal(false);
+              setDetailItem(null);
+            }}
+          />
         )}
         
         </div>
