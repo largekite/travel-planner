@@ -546,6 +546,7 @@ useEffect(() => {
           setHotel={setHotel}
           setCity={setCity}
           apiBase={API_BASE}
+          onSampleItinerary={() => setShowSampleItinerary(true)}
         />
         
         {/* Route Optimization Panel */}
@@ -640,40 +641,10 @@ useEffect(() => {
               plan={plan}
               setPlan={setPlan}
               openSlot={(slot: string) => openSlot(slot as SlotKey)}
+              onAutoFill={handleAutoFill}
+              loadingProgress={loadingProgress}
             />
             
-            {/* Quick Actions */}
-            <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm">
-              <div className="font-semibold mb-3">Quick Actions</div>
-              <div className="flex gap-2 flex-wrap">
-
-                
-                <Tooltip content="Generate a sample day-to-day itinerary">
-                  <button
-                    onClick={() => setShowSampleItinerary(true)}
-                    className="px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50 text-sm"
-                  >
-                    Sample Itinerary
-                  </button>
-                </Tooltip>
-                
-                <Tooltip content="Automatically fill day with popular places">
-                  <button
-                    onClick={handleAutoFill}
-                    disabled={loadingProgress > 0}
-                    className="px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50 text-sm disabled:opacity-50"
-                  >
-                    {loadingProgress > 0 ? 'Filling...' : 'Auto-fill Day'}
-                  </button>
-                </Tooltip>
-              </div>
-              
-              {/* Help hints */}
-              <div className="mt-3 text-xs text-slate-500 space-y-1">
-                <div>💡 Tip: Swipe left/right to change days on mobile</div>
-                <div>⌨️ Shortcuts: Ctrl+Z (undo), Ctrl+S (save), Ctrl+P (print)</div>
-              </div>
-            </div>
           </div>
 
           <MapPanel

@@ -9,6 +9,7 @@ type Props = {
   setHotel: (h: SelectedItem | null) => void;
   setCity: (city: string) => void;
   apiBase: string;
+  onSampleItinerary?: () => void;
 };
 
 export default function HotelSection({
@@ -17,6 +18,7 @@ export default function HotelSection({
   setHotel,
   setCity,
   apiBase,
+  onSampleItinerary,
 }: Props) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -136,6 +138,15 @@ export default function HotelSection({
         >
           <Crosshair className="w-4 h-4" /> Use my location
         </button>
+        {onSampleItinerary && (
+          <button
+            onClick={onSampleItinerary}
+            className="px-3 py-2 rounded-lg border flex items-center gap-2 bg-white hover:bg-slate-50 text-sm"
+            type="button"
+          >
+            Sample Itinerary
+          </button>
+        )}
       </div>
       {error && <div className="text-xs text-amber-700 mb-2">{error}</div>}
       {loading && <div className="text-xs text-slate-500">Searching…</div>}

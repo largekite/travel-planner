@@ -8,6 +8,8 @@ type Props = {
   plan: DayPlan[];
   setPlan: (plan: DayPlan[]) => void;
   openSlot: (slot: string) => void;
+  onAutoFill?: () => void;
+  loadingProgress?: number;
 };
 
 const SLOT_ORDER = [
@@ -22,7 +24,7 @@ const SLOT_ORDER = [
 
 
 
-export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot }: Props) {
+export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot, onAutoFill, loadingProgress }: Props) {
   const currentDayData = plan[currentDay - 1] || {};
   const [selectedPlace, setSelectedPlace] = useState<SelectedItem | null>(null);
   
@@ -48,9 +50,21 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
     <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold">Day {currentDay} Itinerary</h2>
-        <div className="text-xs text-slate-500 flex items-center gap-1">
-          <Clock className="w-3 h-3" />
-          Scheduled timeline
+        <div className="flex items-center gap-3">
+          {onAutoFill && (
+            <button
+              onClick={onAutoFill}
+              disabled={loadingProgress && loadingProgress > 0}
+              className="px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Automatically fill day with popular places"
+            >
+              {loadingProgress && loadingProgress > 0 ? 'Filling...' : 'Auto-fill'}
+            </button>
+          )}
+          <div className="text-xs text-slate-500 flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            Scheduled timeline
+          </div>
         </div>
       </div>
 
