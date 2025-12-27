@@ -78,12 +78,11 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
             
             <div 
               className="flex-1 min-w-0 cursor-pointer hover:bg-slate-50 p-2 rounded transition-colors"
-              onClick={() => item.item?.placeId && setSelectedPlace(item.item!)}
-              title={item.item?.placeId ? "Click to view details" : undefined}
+              onClick={() => item.item && setSelectedPlace(item.item)}
+              title="Click to view details"
             >
-              <div className="font-medium text-sm flex items-center gap-2">
+              <div className="font-medium text-sm">
                 {item.label}
-                {item.item?.placeId && <Eye className="w-3 h-3 text-slate-400" />}
               </div>
               <div className="text-sm text-slate-600 truncate">{item.item?.name}</div>
               {item.item?.area && (
