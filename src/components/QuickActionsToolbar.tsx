@@ -30,7 +30,7 @@ export default function QuickActionsToolbar({
         onClick={onUndo}
         disabled={!canUndo}
         className="p-2 rounded-full hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
-        title="Undo (Ctrl+Z)"
+        title="Undo last change (Ctrl+Z)"
       >
         <Undo2 className="w-4 h-4" />
       </button>
@@ -46,7 +46,7 @@ export default function QuickActionsToolbar({
       <button
         onClick={onSave}
         className="p-2 rounded-full hover:bg-slate-100"
-        title="Save (Ctrl+S)"
+        title="Save to browser (auto-saves every 2 seconds)"
       >
         <Save className="w-4 h-4" />
       </button>

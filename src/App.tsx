@@ -398,22 +398,51 @@ useEffect(() => {
   }
   
   const handleShare = async () => {
-    const url = new URL(window.location.href);
-    url.searchParams.set('city', city);
-    url.searchParams.set('vibe', vibe);
+    // Create a detailed itinerary text to share
+    const itinerary = plan
+      .map((day, i) => {
+        const items = [
+          day.hotel ? `🏨 ${day.hotel.name}` : null,
+          day.breakfast ? `🍳 ${day.breakfast.name}` : null,
+          day.activity ? `🎯 ${day.activity.name}` : null,
+          day.activity2 ? `🎨 ${day.activity2.name}` : null,
+          day.lunch ? `🍽️ ${day.lunch.name}` : null,
+          day.coffee ? `☕ ${day.coffee.name}` : null,
+          day.dinner ? `🍷 ${day.dinner.name}` : null,
+          day.notes ? `📝 ${day.notes}` : null
+        ].filter(Boolean).join('\n');
+        return `Day ${i + 1}:\n${items}`;
+      })
+      .join('\n\n');
+    
+    const shareText = `${vibe.charAt(0).toUpperCase() + vibe.slice(1)} trip to ${city}\n\n${itinerary}`;
     
     if (navigator.share) {
       await navigator.share({
         title: `${vibe} trip to ${city}`,
-        url: url.toString()
+        text: shareText
       });
     } else {
-      navigator.clipboard.writeText(url.toString());
-      alert('Link copied to clipboard!');
+      // Copy detailed itinerary to clipboard
+      navigator.clipboard.writeText(shareText);
+      alert('Itinerary copied to clipboard!');
     }
   };
   
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    // Create print styles to hide everything except plan view
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @media print {
+        body > * { display: none; }
+        [data-print-section] { display: block !important; }
+      }
+    `;
+    document.head.appendChild(style);
+    window.print();
+    // Clean up after printing
+    setTimeout(() => document.head.removeChild(style), 100);
+  };
   
   const handleAutoFill = async () => {
     if (!API_BASE) return;
@@ -686,7 +715,7 @@ useEffect(() => {
         </div>
 
         {/* Plan view */}
-        <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm">
+        <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm" data-print-section>
           <div className="flex items-center justify-between">
             <div className="font-semibold">Plan View</div>
             <div className="flex items-center gap-2">
