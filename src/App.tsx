@@ -419,7 +419,7 @@ useEffect(() => {
     if (!API_BASE) return;
     
     setLoadingProgress(0);
-    const slots = ['hotel', 'breakfast', 'activity', 'lunch', 'coffee', 'dinner'];
+    const slots = ['hotel', 'breakfast', 'activity', 'activity2', 'lunch', 'coffee', 'dinner'];
     
     try {
       // Fetch more options to avoid duplicates
