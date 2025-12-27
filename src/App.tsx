@@ -704,8 +704,8 @@ useEffect(() => {
                     <div>
                       <div className="font-medium mb-2 text-slate-700">Your Current Order:</div>
                       <div className="space-y-1">
-                        {chosenItems.map((item, i) => (
-                          <div key={i} className="text-slate-600">
+                        {uniqueItems.map((item, i) => (
+                          <div key={i} className="text-slate-600 text-xs">
                             {i + 1}. {item.name}
                           </div>
                         ))}
@@ -716,8 +716,20 @@ useEffect(() => {
                       <div className="font-medium mb-2 text-slate-700">Suggested Order:</div>
                       <div className="space-y-1">
                         {optimization.optimizedOrder.map((item, i) => (
-                          <div key={i} className="text-slate-600">
+                          <div key={i} className="text-slate-600 text-xs">
                             {i + 1}. {item.name}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-2 text-xs text-slate-500">
+                        Walking: {optimization.totalTime}min, {optimization.totalDistance}km
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3 text-xs text-slate-600 bg-blue-50 border border-blue-200 rounded p-2">
+                    <strong>What this does:</strong> Rearranges your day's activities to minimize walking. Your hotel stays the same.
+                  </div>
                           </div>
                         ))}
                       </div>
@@ -729,6 +741,9 @@ useEffect(() => {
                   
                   <button
                     onClick={() => {
+                      const confirmMsg = `Replace your day's itinerary with this order?\n\nBreakfast: ${uniqueItems[0]?.name || 'TBD'}\nMorning Activity: ${uniqueItems[1]?.name || 'TBD'}\nLunch: ${uniqueItems[2]?.name || 'TBD'}\nCoffee: ${uniqueItems[3]?.name || 'TBD'}\nDinner: ${uniqueItems[4]?.name || 'TBD'}\n\n(Hotel stays as ${hotel?.name || 'TBD'})`;
+                      if (!window.confirm(confirmMsg)) return;
+
                       // Apply optimization to current day
                       const dayData = { ...currentDayData };
                       const slots = ['breakfast', 'activity', 'lunch', 'coffee', 'dinner'] as const;
@@ -751,7 +766,7 @@ useEffect(() => {
                     }}
                     className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
                   >
-                    Use This Order
+                    Use Suggested Order
                   </button>
                 </div>
               );
