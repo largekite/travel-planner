@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { X, Footprints, Car, ExternalLink, Map as MapIcon, List, Star, Plus, Eye, Sliders } from "lucide-react";
+import { X, Footprints, Car, ExternalLink, Map as MapIcon, List, Star, Plus, Sliders } from "lucide-react";
 import { ApiSuggestion, SelectedItem } from "../lib/types";
 import AutocompleteInput from "./AutocompleteInput";
 import PlaceDetails from "./PlaceDetails";
@@ -468,13 +468,6 @@ function ListView({
             )}
           </div>
           <div className="flex gap-1">
-            <button
-              onClick={(e) => { e.stopPropagation(); onViewDetails(it); }}
-              className="px-2 py-1 rounded border bg-white hover:bg-slate-50 text-xs"
-              title="View details"
-            >
-              <Eye className="w-3 h-3" />
-            </button>
             <button
               onClick={(e) => { e.stopPropagation(); onAddToCompare(it); }}
               className="px-2 py-1 rounded border bg-white hover:bg-slate-50 text-xs"

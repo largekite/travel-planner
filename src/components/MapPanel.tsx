@@ -339,13 +339,15 @@ export default function MapPanel({
       )}
 
       <div className="mt-2 text-xs text-slate-600">
-        {chosenItems.length === 0 ? (
+        {chosenItems.length === 0 && !hotel ? (
           <div>No places selected yet.</div>
         ) : (
           <ul className="list-disc pl-5">
             {(() => {
               const seen = new Set<string>();
-              return chosenItems.map((p, i) => {
+              const allItems = hotel ? [hotel, ...chosenItems] : chosenItems;
+              
+              return allItems.map((p, i) => {
                 if (!p || !p.name || seen.has(p.name)) return null;
                 seen.add(p.name);
                 return (
