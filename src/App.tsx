@@ -670,14 +670,25 @@ useEffect(() => {
             </div>
             
             {showOptimization && (() => {
+              // Exclude the hotel from optimization input and dedupe by name
+              const itemsToOptimize = chosenItems.filter(ci => ci.name !== hotel?.name);
+              const uniqueItems: SelectedItem[] = [];
+              const seen = new Set<string>();
+              for (const it of itemsToOptimize) {
+                if (!it || !it.name) continue;
+                if (seen.has(it.name)) continue;
+                seen.add(it.name);
+                uniqueItems.push(it);
+              }
+
               const optimization = optimizeRoute(
-                chosenItems, 
+                uniqueItems,
                 hotel ? { lat: hotel.lat!, lng: hotel.lng! } : undefined,
                 "walk"
               );
               // Compute original route totals for a fair comparison
               const originalTotals = calculateRouteTotals(
-                chosenItems,
+                uniqueItems,
                 hotel ? { lat: hotel.lat!, lng: hotel.lng! } : undefined,
                 "walk"
               );
