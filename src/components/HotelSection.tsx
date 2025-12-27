@@ -125,7 +125,7 @@ export default function HotelSection({
                 searchHotels(query);
               }
             }}
-            placeholder="e.g., Chicago, San Francisco, New York"
+            placeholder="Search for hotels/areas or press Enter"
             className="outline-none w-full text-sm"
           />
         </div>
@@ -149,7 +149,6 @@ export default function HotelSection({
                 setQuery(suggestion);
                 setSuggestions([]);
                 setCity(suggestion);
-                searchHotels(suggestion);
               }}
               className="block w-full text-left py-1 px-2 hover:bg-blue-100 rounded text-sm"
             >
