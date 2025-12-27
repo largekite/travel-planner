@@ -207,6 +207,7 @@ export default function App() {
 
   // open picker
   function openSlot(slot: SlotKey) {
+    console.log('[openSlot] Opening modal for slot:', slot, 'current hotel:', hotel?.name);
     setSlotKey(slot);
     setSlotModalOpen(true);
     // Clear any existing items to force fresh fetch
@@ -431,9 +432,9 @@ useEffect(() => {
   // Debug: log hotel state changes
   useEffect(() => {
     if (hotel) {
-      console.log('[App] Hotel state changed to:', hotel.name, 'lat:', hotel.lat, 'lng:', hotel.lng);
+      console.log('[App useEffect] Hotel state changed to:', hotel.name, 'lat:', hotel.lat, 'lng:', hotel.lng);
     } else {
-      console.log('[App] Hotel state cleared');
+      console.log('[App useEffect] Hotel state cleared (is now null)');
     }
   }, [hotel]);
   
