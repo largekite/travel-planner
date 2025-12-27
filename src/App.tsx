@@ -462,6 +462,22 @@ useEffect(() => {
       
       setPlan(newPlan);
       setLoadingProgress(100);
+      
+      // Generate notes for the auto-filled day
+      const dayIdx = currentDay;
+      const snapshot = cloneDay(newPlan[dayIdx - 1]);
+      
+      fetchDayNotes(API_BASE, dayIdx, city, vibe, snapshot)
+        .then((notes) => {
+          if (!notes) return;
+          
+          const updated = [...newPlan];
+          updated[dayIdx - 1].notes = notes;
+          setPlan(updated);
+        })
+        .catch(() => {
+          // ignore notes error
+        });
     } catch (error) {
       console.error('Auto-fill failed:', error);
     }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Calendar, Download, Share2, X, MapPin, Clock } from 'lucide-react';
 import { DayPlan, Vibe, ApiSuggestion } from '../lib/types';
-import { fetchAllPlaces, detectApiBase } from '../lib/api';
+import { fetchAllPlaces, detectApiBase, fetchDayNotes } from '../lib/api';
 
 type Props = {
   city: string;
@@ -45,7 +45,7 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
       for (let day = 1; day <= daysCount; day++) {
         const dayData: SampleDay = {
           day,
-          notes: getNotesForDay(day, vibe, city)
+          notes: getNotesForDay(day, vibe, city) // Will be replaced by AI notes
         };
         
         // Fetch real suggestions for each slot
@@ -67,6 +67,27 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
           } catch (err) {
             console.error(`Failed to fetch ${slot} for day ${day}:`, err);
           }
+        }
+        
+        // Fetch AI-generated notes for this day
+        try {
+          const selections = {
+            hotel: dayData.hotel,
+            breakfast: dayData.breakfast,
+            activity: dayData.activity,
+            lunch: dayData.lunch,
+            activity2: dayData.activity2,
+            coffee: dayData.coffee,
+            dinner: dayData.dinner
+          };
+          
+          const aiNotes = await fetchDayNotes(API_BASE, day, city, vibe, selections);
+          if (aiNotes) {
+            dayData.notes = aiNotes;
+          }
+        } catch (err) {
+          console.error(`Failed to fetch AI notes for day ${day}:`, err);
+          // Keep the default notes if AI fails
         }
         
         plan.push(dayData);

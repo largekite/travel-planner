@@ -45,7 +45,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .map(([k, v]) => `${k}: ${(v as any).name}`)
         .join(", ");
 
-      const prompt = `You are a travel planner. Write a short, friendly day-plan note for Day ${day} in ${city} for a "${vibe}" vibe. Mention these picks: ${summary}. Keep it 3-5 sentences.`;
+      const vibeInstructions = {
+        romantic: "Write in a romantic, intimate tone. Emphasize cozy moments and special experiences.",
+        family: "Write in a fun, family-friendly tone. Include tips for kids and group activities.",
+        adventurous: "Write in an adventurous, excited tone. Focus on unique experiences and hidden gems.",
+        popular: "Write in an engaging, informative tone. Highlight why these are must-visit spots."
+      };
+
+      const vibeGuide = vibeInstructions[vibe as keyof typeof vibeInstructions] || vibeInstructions.popular;
+
+      const prompt = `You are a travel planner writing a day plan note for Day ${day} in ${city}.
+${vibeGuide}
+Based on these selections: ${summary}
+Write a short, engaging day-plan note that ties the activities together and creates excitement for the day. Keep it 3-5 sentences. Be specific and reference the places/activities selected.`;
 
       try {
         const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -57,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           body: JSON.stringify({
             model: "gpt-4o-mini",
             messages: [{ role: "user", content: prompt }],
-            temperature: 0.7,
+            temperature: 0.9,
           }),
         }).then((r) => r.json());
 
