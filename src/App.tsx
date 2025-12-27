@@ -430,18 +430,68 @@ useEffect(() => {
   };
   
   const handlePrint = () => {
-    // Create print styles to hide everything except plan view
-    const style = document.createElement('style');
-    style.innerHTML = `
-      @media print {
-        body > * { display: none; }
-        [data-print-section] { display: block !important; }
-      }
+    // Create a print-friendly version of the plan
+    const planHTML = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${vibe} Trip to ${city}</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; margin: 20px; }
+            h1 { color: #333; margin-bottom: 30px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { background-color: #f0f0f0; padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold; }
+            td { padding: 12px; border: 1px solid #ddd; }
+            tr:nth-child(even) { background-color: #f9f9f9; }
+            @media print { body { margin: 10px; } }
+          </style>
+        </head>
+        <body>
+          <h1>${vibe.charAt(0).toUpperCase() + vibe.slice(1)} Trip to ${city}</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Hotel</th>
+                <th>Breakfast</th>
+                <th>Morning Activity</th>
+                <th>Afternoon Activity</th>
+                <th>Lunch</th>
+                <th>Coffee</th>
+                <th>Dinner</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${plan.map((d, i) => `
+                <tr>
+                  <td><strong>Day ${i + 1}</strong></td>
+                  <td>${d.hotel?.name || '—'}</td>
+                  <td>${d.breakfast?.name || '—'}</td>
+                  <td>${d.activity?.name || '—'}</td>
+                  <td>${d.activity2?.name || '—'}</td>
+                  <td>${d.lunch?.name || '—'}</td>
+                  <td>${d.coffee?.name || '—'}</td>
+                  <td>${d.dinner?.name || '—'}</td>
+                  <td>${d.notes || '—'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
     `;
-    document.head.appendChild(style);
-    window.print();
-    // Clean up after printing
-    setTimeout(() => document.head.removeChild(style), 100);
+    
+    // Open in new window and print
+    const printWindow = window.open('', '', 'width=1200,height=800');
+    if (printWindow) {
+      printWindow.document.write(planHTML);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+        printWindow.close();
+      };
+    }
   };
   
   const handleAutoFill = async () => {
@@ -716,25 +766,7 @@ useEffect(() => {
 
         {/* Plan view */}
         <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm" data-print-section>
-          <div className="flex items-center justify-between">
-            <div className="font-semibold">Plan View</div>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={handleShare}
-                className="px-3 py-1.5 rounded-lg border bg-white text-sm flex items-center gap-2"
-              >
-                <Share2 className="w-4 h-4" />
-                Share
-              </button>
-              <button
-                onClick={handlePrint}
-                className="px-3 py-1.5 rounded-lg border bg-slate-50 text-sm flex items-center gap-2"
-              >
-                <Printer className="w-4 h-4" />
-                Print
-              </button>
-            </div>
-          </div>
+          <div className="font-semibold mb-3">Plan View</div>
           <div className="mt-3 overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
