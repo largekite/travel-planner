@@ -746,8 +746,10 @@ useEffect(() => {
                       <td className="py-2 pr-4">
                         {d.dinner?.name || <span className="text-slate-400">—</span>}
                       </td>
-                    <td className="py-2 pr-4 max-w-[320px] truncate" title={d.notes}>
-                      {d.notes || <span className="text-slate-400">—</span>}
+                    <td className="py-2 pr-4 max-w-[400px]" title={d.notes}>
+                      <div className="line-clamp-3 text-slate-700 leading-relaxed">
+                        {d.notes || <span className="text-slate-400">—</span>}
+                      </div>
                     </td>
                   </tr>
                 ))}
