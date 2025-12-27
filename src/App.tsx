@@ -64,15 +64,18 @@ export default function App() {
 
   // global trip state with history
   const [country, setCountry] = useState("USA");
-  const [city, setCity] = useState(() => 
-    localStorage.getItem('travel-city') || "St. Louis"
-  );
+  const [city, setCity] = useState(() => {
+    const saved = localStorage.getItem('travel-city');
+    // Return empty string if not found, will show Quick Start
+    return saved || "";
+  });
   const [vibe, setVibe] = useState<Vibe>(() => {
+    // Only restore vibe if saved-plan exists
     const saved = localStorage.getItem('saved-plan');
     if (saved) {
       try {
         const data = JSON.parse(saved);
-        return data.vibe || "popular";
+        if (data.vibe) return data.vibe;
       } catch {}
     }
     return "popular";
@@ -118,7 +121,7 @@ export default function App() {
   });
   
   // UI state
-  const [showSmartDefaults, setShowSmartDefaults] = useState(!city || city === "St. Louis");
+  const [showSmartDefaults, setShowSmartDefaults] = useState(!city || city === "");
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
@@ -381,9 +384,10 @@ useEffect(() => {
   function handleClearSaved() {
     const ok = window.confirm('Clear saved trip and reset to defaults? This will remove saved city and plan from your browser.');
     if (!ok) return;
+    // Clear all saved data
     localStorage.removeItem('saved-plan');
     localStorage.removeItem('travel-city');
-    // Reset state
+    // Reset all state to defaults
     setCity('');
     setVibe('popular');
     setHotel(null);
