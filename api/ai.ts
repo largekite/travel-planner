@@ -40,24 +40,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const day = body.day;
       const selections = body.selections || {};
 
-      const summary = Object.entries(selections)
+      // Build detailed context about each selection
+      const placeDetails = Object.entries(selections)
         .filter(([, v]) => v && (v as any).name)
-        .map(([k, v]) => `${k}: ${(v as any).name}`)
-        .join(", ");
+        .map(([slot, v]) => {
+          const place = v as any;
+          const parts = [
+            `${slot}: ${place.name}`,
+            place.rating ? `(${place.rating}★)` : '',
+            place.types?.[0] ? `[${place.types[0].replace(/_/g, ' ')}]` : '',
+            place.vicinity || place.formatted_address ? `in ${place.vicinity || place.formatted_address}` : ''
+          ];
+          return parts.filter(Boolean).join(' ');
+        });
+
+      const summary = placeDetails.join(' → ');
 
       const vibeInstructions = {
-        romantic: "Write in a romantic, intimate tone. Emphasize cozy moments, special experiences for couples, and intimate settings. Prioritize romantic restaurants, sunset spots, wine bars, and peaceful experiences.",
-        family: "Write in a fun, family-friendly tone. Focus on kid-friendly attractions, interactive experiences, and group-friendly activities. Highlight parks, museums with hands-on exhibits, and restaurants where children are welcome. Include practical tips for keeping kids engaged.",
-        adventurous: "Write in an adventurous, energetic tone. Emphasize outdoor activities, physical experiences, and off-the-beaten-path discoveries. Prioritize hiking, water sports, adventure tours, and unique local experiences. Focus on active exploration and authentic encounters.",
-        popular: "Write in an engaging, informative tone. Highlight iconic landmarks, famous restaurants, must-see attractions, and highly-rated experiences. Explain why these are essential visits and what makes them special. Focus on can't-miss experiences and cultural significance."
+        romantic: "Craft a romantic, intimate narrative. Highlight cozy ambiance, special moments for couples, and why each spot creates a memorable romantic experience. Mention specific features like sunset views, candlelit settings, or intimate atmospheres.",
+        family: "Create an exciting, family-friendly story. Emphasize what makes each place fun for kids and parents alike. Mention hands-on activities, kid-friendly menus, or interactive elements. Make it sound like an adventure the whole family will love.",
+        adventurous: "Write with energy and excitement. Focus on the unique, active experiences at each location. Highlight outdoor elements, physical activities, or off-the-beaten-path discoveries. Make it feel like a thrilling day of exploration.",
+        popular: "Craft an informative, enthusiastic narrative. Explain what makes these iconic spots must-visit destinations. Reference their fame, cultural significance, or what travelers consistently rave about. Make readers understand why these are can't-miss experiences."
       };
 
       const vibeGuide = vibeInstructions[vibe as keyof typeof vibeInstructions] || vibeInstructions.popular;
 
-      const prompt = `You are a travel planner writing a very concise day-plan note for Day ${day} in ${city}.
-    ${vibeGuide}
-    Based on these selections: ${summary}
-    Write a short 1-2 sentence summary (one short sentence preferred) that highlights the day's plan and key places. Use plain, direct language, reference the selected spots briefly, and avoid lists, headers, or extra commentary. Keep it under ~35 words.`;
+      const prompt = `You are a creative travel writer crafting a compelling day summary for Day ${day} in ${city}.
+
+VIBE: ${vibe.toUpperCase()}
+${vibeGuide}
+
+YOUR ITINERARY:
+${summary}
+
+Write ONE vivid sentence (25-40 words) that weaves these places into a cohesive story. Mention 2-3 specific place names naturally. Focus on the EXPERIENCE and ATMOSPHERE, not just listing locations. Make readers excited about this day.
+
+Examples of good style:
+- "Start with croissants at the charming Café de Flore, then climb the Eiffel Tower for breathtaking city views before savoring haute cuisine at Le Jules Verne."
+- "Adventure awaits at Zion National Park's Angel's Landing trail, followed by craft beers and wood-fired pizza at Zion Brewery to celebrate your summit."
+
+Write your sentence now (no preamble, just the sentence):`;
 
       try {
         const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -69,8 +91,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           body: JSON.stringify({
             model: "gpt-4o-mini",
             messages: [{ role: "user", content: prompt }],
-            temperature: 0.6,
-            max_tokens: 120
+            temperature: 0.8,
+            max_tokens: 80
           }),
         }).then((r) => r.json());
 
