@@ -6,11 +6,15 @@ import HotelSection from "./components/HotelSection";
 import DayPlanner from "./components/DayPlanner";
 import SuggestionModal from "./components/SuggestionModal";
 import MapPanel from "./components/MapPanel";
+import HeroImage from "./components/HeroImage";
+import Footer from "./components/Footer";
+import ViewToggle from "./components/ViewToggle";
 import {
   DayPlan,
   SelectedItem,
   SlotKey,
   Vibe,
+  Budget,
   ApiSuggestion,
   DirectionsSegment,
 } from "./lib/types";
@@ -22,6 +26,7 @@ import {
   detectApiBase,
 } from "./lib/api";
 import { optimizeRoute, calculateRouteTotals } from "./lib/routeOptimizer";
+import { exportToPDF } from "./utils/exportPDF";
 import LocationButton from "./components/LocationButton";
 import ErrorBoundary from "./components/ErrorBoundary";
 import PlaceDetails from "./components/PlaceDetails";
@@ -92,6 +97,8 @@ export default function App() {
     return 3;
   });
   const [currentDay, setCurrentDay] = useState(1);
+  const [budget, setBudget] = useState<Budget>('moderate');
+  const [mobileView, setMobileView] = useState<'list' | 'map'>('list');
   
   // Load saved plan from localStorage
   const getInitialPlan = (): DayPlan[] => {
@@ -625,7 +632,10 @@ useEffect(() => {
           currentDay={currentDay}
           setCurrentDay={setCurrentDay}
         />
-        
+
+        {/* Hero Image */}
+        {city && <HeroImage city={city} />}
+
         {/* Smart Defaults */}
         {showSmartDefaults && (
           <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm">
@@ -772,7 +782,7 @@ useEffect(() => {
         )}
 
         <div className="grid lg:grid-cols-2 gap-5">
-          <div className="space-y-4">
+          <div className={`space-y-4 ${mobileView === 'map' ? 'hidden lg:block' : ''}`}>
             <DragDropDayPlanner
               currentDay={currentDay}
               plan={plan}
@@ -780,24 +790,31 @@ useEffect(() => {
               openSlot={(slot: string) => openSlot(slot as SlotKey)}
               onAutoFill={handleAutoFill}
               loadingProgress={loadingProgress}
+              city={city}
+              vibe={vibe}
             />
-            
+
           </div>
 
-          <MapPanel
-            currentDay={currentDay}
-            city={city}
-            hotel={hotel}
-            chosenItems={chosenItems}
-            dirSegs={dirSegs}
-            dirErr={dirErr}
-            onItemClick={(item) => {
-              // Open details modal for the clicked item
-              setDetailItem(item);
-              setShowDetailModal(true);
-            }}
-          />
+          <div className={`${mobileView === 'list' ? 'hidden lg:block' : ''}`}>
+            <MapPanel
+              currentDay={currentDay}
+              city={city}
+              hotel={hotel}
+              chosenItems={chosenItems}
+              dirSegs={dirSegs}
+              dirErr={dirErr}
+              onItemClick={(item) => {
+                // Open details modal for the clicked item
+                setDetailItem(item);
+                setShowDetailModal(true);
+              }}
+            />
+          </div>
         </div>
+
+        {/* Mobile View Toggle */}
+        <ViewToggle view={mobileView} onViewChange={setMobileView} />
 
         {/* Plan view */}
         <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm" data-print-section>
@@ -886,6 +903,7 @@ useEffect(() => {
           onSave={handleSave}
           onShare={handleShare}
           onPrint={handlePrint}
+          onExportPDF={() => exportToPDF(plan, city, vibe)}
           onHelp={() => setShowHelp(true)}
           onClearSaved={handleClearSaved}
         />
@@ -928,7 +946,7 @@ useEffect(() => {
         
         {/* Place details modal from map click */}
         {showDetailModal && detailItem && (
-          <PlaceDetails 
+          <PlaceDetails
             place={detailItem}
             onClose={() => {
               setShowDetailModal(false);
@@ -936,8 +954,11 @@ useEffect(() => {
             }}
           />
         )}
-        
+
         </div>
+
+        {/* Footer */}
+        <Footer />
       </div>
     </ErrorBoundary>
   );

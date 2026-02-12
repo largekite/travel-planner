@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { X, Footprints, Car, ExternalLink, Map as MapIcon, List, Star, Plus, Sliders } from "lucide-react";
-import { ApiSuggestion, SelectedItem } from "../lib/types";
+import { ApiSuggestion, SelectedItem, Budget } from "../lib/types";
 import AutocompleteInput from "./AutocompleteInput";
 import PlaceDetails from "./PlaceDetails";
 import PlaceComparison from "./PlaceComparison";
@@ -48,6 +48,8 @@ type Props = {
   setSortMode: (m: "default" | "distance" | "rating") => void;
   lastFetchUrl?: string;
   lastResultCount?: number;
+  budget?: Budget;
+  setBudget?: (b: Budget) => void;
 };
 
 type FilterState = {
@@ -77,6 +79,8 @@ export default function SuggestionModal({
   setSortMode,
   lastFetchUrl,
   lastResultCount,
+  budget = 'moderate',
+  setBudget,
 }: Props) {
   if (!open) return null;
 
@@ -167,7 +171,30 @@ export default function SuggestionModal({
                   types={["neighborhood", "sublocality"]}
                 />
               </div>
-              
+
+              {/* Budget filter */}
+              {setBudget && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-slate-600">Budget:</span>
+                  {(['budget', 'moderate', 'luxury'] as Budget[]).map((b) => (
+                    <button
+                      key={b}
+                      onClick={() => setBudget(b)}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                        budget === b
+                          ? 'bg-kite-blue text-white'
+                          : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+                      }`}
+                      type="button"
+                    >
+                      {b === 'budget' && '$'}
+                      {b === 'moderate' && '$$'}
+                      {b === 'luxury' && '$$$'}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className={`px-2 py-1 rounded border text-xs flex items-center gap-1 ${

@@ -46,10 +46,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .join(", ");
 
       const vibeInstructions = {
-        romantic: "Write in a romantic, intimate tone. Emphasize cozy moments and special experiences.",
-        family: "Write in a fun, family-friendly tone. Include tips for kids and group activities.",
-        adventurous: "Write in an adventurous, excited tone. Focus on unique experiences and hidden gems.",
-        popular: "Write in an engaging, informative tone. Highlight why these are must-visit spots."
+        romantic: "Write in a romantic, intimate tone. Emphasize cozy moments, special experiences for couples, and intimate settings. Prioritize romantic restaurants, sunset spots, wine bars, and peaceful experiences.",
+        family: "Write in a fun, family-friendly tone. Focus on kid-friendly attractions, interactive experiences, and group-friendly activities. Highlight parks, museums with hands-on exhibits, and restaurants where children are welcome. Include practical tips for keeping kids engaged.",
+        adventurous: "Write in an adventurous, energetic tone. Emphasize outdoor activities, physical experiences, and off-the-beaten-path discoveries. Prioritize hiking, water sports, adventure tours, and unique local experiences. Focus on active exploration and authentic encounters.",
+        popular: "Write in an engaging, informative tone. Highlight iconic landmarks, famous restaurants, must-see attractions, and highly-rated experiences. Explain why these are essential visits and what makes them special. Focus on can't-miss experiences and cultural significance."
       };
 
       const vibeGuide = vibeInstructions[vibe as keyof typeof vibeInstructions] || vibeInstructions.popular;

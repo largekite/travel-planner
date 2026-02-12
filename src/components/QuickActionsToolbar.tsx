@@ -1,5 +1,5 @@
 import React from 'react';
-import { Undo2, Redo2, Save, Share2, Printer, HelpCircle, Trash2 } from 'lucide-react';
+import { Undo2, Redo2, Save, Share2, Printer, HelpCircle, Trash2, FileDown } from 'lucide-react';
 
 type Props = {
   canUndo: boolean;
@@ -9,6 +9,7 @@ type Props = {
   onSave: () => void;
   onShare: () => void;
   onPrint: () => void;
+  onExportPDF?: () => void;
   onHelp: () => void;
   onClearSaved?: () => void;
 };
@@ -21,8 +22,9 @@ export default function QuickActionsToolbar({
   onSave,
   onShare,
   onPrint,
-  onHelp
-  ,onClearSaved
+  onExportPDF,
+  onHelp,
+  onClearSaved
 }: Props) {
   return (
     <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-lg border p-2 flex gap-1 z-50">
@@ -64,6 +66,15 @@ export default function QuickActionsToolbar({
       >
         <Printer className="w-4 h-4" />
       </button>
+      {onExportPDF && (
+        <button
+          onClick={onExportPDF}
+          className="p-2 rounded-full hover:bg-slate-100"
+          title="Export as PDF"
+        >
+          <FileDown className="w-4 h-4 text-kite-blue" />
+        </button>
+      )}
       <button
         onClick={onHelp}
         className="p-2 rounded-full hover:bg-slate-100"
