@@ -337,6 +337,7 @@ useEffect(() => {
     vibe,
     slot: slotKey,
     limit: "10",
+    budget,
     near: String(useNearFilter),
     mode: nearMode,
     maxMins: String(nearMaxMins),
@@ -369,6 +370,7 @@ useEffect(() => {
   city,
   vibe,
   slotKey,
+  budget,
   useNearFilter,
   nearMode,
   nearMaxMins,
@@ -508,15 +510,15 @@ useEffect(() => {
   
   const handleAutoFill = async () => {
     if (!API_BASE) return;
-    
+
     setLoadingProgress(0);
     const slots = ['hotel', 'breakfast', 'activity', 'activity2', 'lunch', 'coffee', 'dinner'];
-    
+
     try {
       // Fetch more options to avoid duplicates
       const promises = slots.map(slot => {
         const params = new URLSearchParams({
-          city, vibe, slot, limit: "5"
+          city, vibe, slot, limit: "5", budget
         });
         return fetchAllPlaces(API_BASE, params, 1).then(result => ({ slot, items: result.items }));
       });
@@ -892,6 +894,8 @@ useEffect(() => {
           setSortMode={setSortMode}
           lastFetchUrl={lastFetchUrl}
           lastResultCount={lastResultCount}
+          budget={budget}
+          setBudget={setBudget}
         />
         
         {/* Quick Actions Toolbar */}
