@@ -9,7 +9,7 @@ export default function Footer() {
           <div>
             <h3 className="font-semibold mb-4 text-lg">About</h3>
             <p className="text-sm text-slate-400 leading-relaxed">
-              AI-powered travel planning made simple. Create personalized itineraries in seconds with our intelligent recommendations.
+              Smart travel planning made simple. Create personalized itineraries in seconds with curated local recommendations.
             </p>
           </div>
 
@@ -83,7 +83,7 @@ export default function Footer() {
               <strong className="text-white">Affiliate Disclosure:</strong> We may earn a commission from bookings made through our affiliate links (Booking.com, Viator, GetYourGuide) at no extra cost to you. This helps us keep the service free and continuously improve our recommendations.
             </p>
             <p className="text-xs opacity-75">
-              © {currentYear} Largekite Travel Planner. All rights reserved. Powered by Google Places API, OpenAI, and Unsplash.
+              © {currentYear} Largekite Travel Planner. All rights reserved. Powered by Google Places & Unsplash.
             </p>
           </div>
         </div>

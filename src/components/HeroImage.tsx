@@ -48,7 +48,7 @@ export default function HeroImage({ city }: Props) {
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
           <div className="absolute bottom-6 left-6 text-white">
             <h1 className="text-4xl font-bold mb-2">Your {city} Adventure</h1>
-            <p className="text-sm opacity-90">Powered by AI-curated recommendations</p>
+            <p className="text-sm opacity-90">Curated local recommendations</p>
           </div>
           {photographer && (
             <div className="absolute bottom-2 right-2 text-white text-xs opacity-70">
@@ -60,7 +60,7 @@ export default function HeroImage({ city }: Props) {
         <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center">
           <div className="text-center text-white">
             <h1 className="text-4xl font-bold mb-2">Your {city} Adventure</h1>
-            <p className="text-sm opacity-90">Powered by AI-curated recommendations</p>
+            <p className="text-sm opacity-90">Curated local recommendations</p>
           </div>
         </div>
       )}

@@ -1,13 +1,22 @@
 import { useEffect, useState, type ElementType } from 'react';
 import { Zap, Heart, Users, Mountain, Star } from 'lucide-react';
 import { VIBES, Vibe } from '../lib/types';
-import { detectApiBase } from '../lib/api';
 
-// ─── City cards with lazy Unsplash photos ────────────────────────────────────
+// ─── City cards with Wikipedia photos ─────────────────────────────────────────
 
 const POPULAR_CITIES = [
-  "New York", "Chicago", "Los Angeles", "San Francisco", "Miami", "St. Louis",
+  "New York City", "Chicago", "Los Angeles", "San Francisco", "Miami", "St. Louis",
 ];
+
+// Wikipedia page titles for accurate lookups
+const WIKI_TITLES: Record<string, string> = {
+  "New York City": "New_York_City",
+  "Chicago": "Chicago",
+  "Los Angeles": "Los_Angeles",
+  "San Francisco": "San_Francisco",
+  "Miami": "Miami",
+  "St. Louis": "St._Louis",
+};
 
 // Simple in-memory cache so switching back/forth doesn't re-fetch
 const photoCache: Record<string, string> = {};
@@ -16,15 +25,15 @@ function CityCard({ city, onSelect }: { city: string; onSelect: () => void }) {
   const [photo, setPhoto] = useState<string | null>(photoCache[city] ?? null);
 
   useEffect(() => {
-    if (photoCache[city]) return; // already cached
-    const apiBase = detectApiBase();
-    if (!apiBase) return;
-    fetch(`${apiBase}/api/unsplash?city=${encodeURIComponent(city)}`)
+    if (photoCache[city]) return;
+    const title = WIKI_TITLES[city] ?? city.replace(/ /g, '_');
+    fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`)
       .then(r => r.json())
       .then(data => {
-        if (data.imageUrl) {
-          photoCache[city] = data.imageUrl;
-          setPhoto(data.imageUrl);
+        const url = data.thumbnail?.source ?? data.originalimage?.source;
+        if (url) {
+          photoCache[city] = url;
+          setPhoto(url);
         }
       })
       .catch(() => {/* silently skip */});
@@ -103,7 +112,11 @@ export default function SmartDefaults({ onCitySelect, onVibeSelect, onQuickFill 
         <div className="text-sm font-medium text-slate-600 mb-2">Popular Destinations</div>
         <div className="grid grid-cols-3 gap-2">
           {POPULAR_CITIES.map(city => (
-            <CityCard key={city} city={city} onSelect={() => onCitySelect(city)} />
+            <CityCard
+              key={city}
+              city={city}
+              onSelect={() => onCitySelect(city === "New York City" ? "New York" : city)}
+            />
           ))}
         </div>
       </div>
