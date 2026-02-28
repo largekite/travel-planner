@@ -3,15 +3,16 @@ import { MapPin, Loader2 } from "lucide-react";
 
 type Props = {
   onLocationFound: (lat: number, lng: number) => void;
+  onError?: (msg: string) => void;
   className?: string;
 };
 
-export default function LocationButton({ onLocationFound, className = "" }: Props) {
+export default function LocationButton({ onLocationFound, onError, className = "" }: Props) {
   const [loading, setLoading] = useState(false);
 
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by this browser.");
+      onError?.("Geolocation is not supported by this browser.");
       return;
     }
 
@@ -23,7 +24,7 @@ export default function LocationButton({ onLocationFound, className = "" }: Prop
       },
       (error) => {
         console.error("Error getting location:", error);
-        alert("Unable to get your location. Please try again.");
+        onError?.("Unable to get your location. Please try again.");
         setLoading(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }

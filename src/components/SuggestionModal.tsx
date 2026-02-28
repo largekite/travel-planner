@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { X, Footprints, Car, ExternalLink, Map as MapIcon, List, Star, Plus, Sliders } from "lucide-react";
 import { ApiSuggestion, SelectedItem, Budget } from "../lib/types";
+import PlacePhoto from "./PlacePhoto";
 import AutocompleteInput from "./AutocompleteInput";
 import PlaceDetails from "./PlaceDetails";
 import PlaceComparison from "./PlaceComparison";
@@ -55,7 +56,6 @@ type Props = {
 type FilterState = {
   priceRange: [number, number];
   minRating: number;
-  openNow: boolean;
 };
 
 export default function SuggestionModal({
@@ -82,8 +82,6 @@ export default function SuggestionModal({
   budget = 'moderate',
   setBudget,
 }: Props) {
-  if (!open) return null;
-
   const [view, setView] = useState<"list" | "map">("list");
   const [selectedPlace, setSelectedPlace] = useState<ApiSuggestion | null>(null);
   const [compareList, setCompareList] = useState<ApiSuggestion[]>([]);
@@ -91,7 +89,6 @@ export default function SuggestionModal({
   const [filters, setFilters] = useState<FilterState>({
     priceRange: [1, 4],
     minRating: 0,
-    openNow: false
   });
 
   // Actually sort the incoming items for display
@@ -118,6 +115,8 @@ export default function SuggestionModal({
     return items;
   }, [items, sortMode, hotel?.lat, hotel?.lng]);
 
+  if (!open) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* overlay */}
@@ -126,7 +125,17 @@ export default function SuggestionModal({
       <div className="relative bg-white rounded-2xl shadow-xl w-[min(900px,96vw)] max-h-[90vh] overflow-hidden flex flex-col">
         {/* header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-slate-50">
-          <div className="font-semibold capitalize">Choose {slotKey}</div>
+          <div className="font-semibold">
+            {({
+              hotel:     'Choose Hotel / Base',
+              breakfast: 'Choose Breakfast',
+              activity:  'Choose Morning Activity',
+              activity2: 'Choose Afternoon Activity',
+              lunch:     'Choose Lunch',
+              coffee:    'Choose Coffee Break',
+              dinner:    'Choose Dinner',
+            } as Record<string, string>)[slotKey] ?? `Choose ${slotKey}`}
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setView("list")}
@@ -204,13 +213,18 @@ export default function SuggestionModal({
                 <Sliders className="w-3.5 h-3.5" /> Filters
               </button>
 
-              <label className="flex items-center gap-2 text-sm">
+              <label
+                className={`flex items-center gap-2 text-sm ${!hotel ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={!hotel ? 'Set a hotel or location first to enable near-me filter' : undefined}
+              >
                 <input
                   type="checkbox"
                   checked={useNearFilter}
+                  disabled={!hotel}
                   onChange={(e) => setUseNearFilter(e.target.checked)}
                 />
-                Filter by near me
+                Near my hotel
+                {!hotel && <span className="text-[10px] text-slate-400">(set hotel first)</span>}
               </label>
 
               <div className="flex items-center gap-2 text-sm">
@@ -251,12 +265,6 @@ export default function SuggestionModal({
                 onChange={(e) => setNearMaxMins(parseInt(e.target.value))}
               />
 
-              {!hotel && useNearFilter && (
-                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
-                  Pick a hotel/center or use your current location to enable
-                  near-me filter.
-                </div>
-              )}
             </div>
             
             {/* Advanced Filters */}
@@ -302,14 +310,6 @@ export default function SuggestionModal({
                     <span>{filters.minRating}</span>
                   </div>
                   
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={filters.openNow}
-                      onChange={(e) => setFilters(f => ({ ...f, openNow: e.target.checked }))}
-                    />
-                    Open now
-                  </label>
                 </div>
               </div>
             )}
@@ -332,14 +332,9 @@ export default function SuggestionModal({
                 </button>
               ))}
             </div>
-            {lastFetchUrl && (
-              <div className="text-[10px] text-slate-400 break-all">
-                last request: {lastFetchUrl}
-              </div>
-            )}
-            {typeof lastResultCount === "number" && (
-              <div className="text-[10px] text-slate-400">
-                {lastResultCount} result(s)
+            {typeof lastResultCount === "number" && lastResultCount > 0 && (
+              <div className="text-[10px] text-slate-400 ml-auto">
+                {lastResultCount} result{lastResultCount !== 1 ? 's' : ''} found
               </div>
             )}
           </div>
@@ -433,7 +428,7 @@ function ListView({
       {filteredItems.map((it, idx) => (
         <div
           key={idx}
-          className="py-3 px-3 flex items-start justify-between gap-3 hover:bg-slate-50 cursor-pointer"
+          className="py-2.5 px-3 flex items-center gap-3 hover:bg-slate-50 cursor-pointer transition-colors"
           onClick={() => onViewDetails(it)}
           role="button"
           tabIndex={0}
@@ -444,70 +439,68 @@ function ListView({
             }
           }}
         >
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              {it.url ? (
-                <a
-                  href={it.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium text-blue-700 hover:underline truncate max-w-[360px]"
-                  title={it.name}
-                >
-                  {idx + 1}. {it.name}
-                </a>
-              ) : (
-                <div className="font-medium truncate max-w-[360px]">
-                  {idx + 1}. {it.name}
-                </div>
-              )}
+          {/* Photo thumbnail */}
+          <PlacePhoto
+            src={it.photos?.[0]}
+            name={it.name}
+            size={52}
+            rounded="lg"
+            className="flex-shrink-0"
+          />
+
+          {/* Details */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-medium text-sm text-slate-800 truncate">
+                {idx + 1}. {it.name}
+              </span>
               {it.url && (
                 <a
                   href={it.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-slate-400 hover:text-slate-700"
+                  className="text-slate-300 hover:text-slate-600 flex-shrink-0"
                   title="Open link"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <ExternalLink className="w-4 h-4" />
+                  <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               )}
             </div>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-slate-400 truncate mt-0.5">
               {[it.cuisine, it.price, it.area].filter(Boolean).join(" · ")}
             </div>
             {it.desc && (
-              <div className="text-xs text-slate-600 mt-0.5">{it.desc}</div>
+              <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{it.desc}</div>
             )}
-            {it.meta && (
-              <div className="text-[11px] text-slate-500 mt-0.5">{it.meta}</div>
-            )}
-            {(it.ratings?.google || it.ratings?.googleReviews) && (
-              <div className="text-[11px] text-slate-500 mt-0.5 flex gap-2 flex-wrap">
-                {it.ratings?.google && (
-                  <span>Google {it.ratings.google.toFixed(1)}</span>
-                )}
-                {typeof it.ratings?.googleReviews === "number" && (
-                  <span>{it.ratings.googleReviews.toLocaleString()} reviews</span>
-                )}
+            {it.ratings?.google && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                <span className="text-[11px] text-slate-500">
+                  {it.ratings.google.toFixed(1)}
+                  {typeof it.ratings.googleReviews === 'number' && (
+                    <span className="text-slate-400"> ({it.ratings.googleReviews.toLocaleString()})</span>
+                  )}
+                </span>
               </div>
             )}
           </div>
-          <div className="flex gap-1">
+
+          {/* Actions */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <button
               onClick={(e) => { e.stopPropagation(); onAddToCompare(it); }}
-              className="px-2 py-1 rounded border bg-white hover:bg-slate-50 text-xs"
+              className="p-1.5 rounded-lg border bg-white hover:bg-slate-100 text-slate-500"
               title="Add to compare"
             >
-              <Plus className="w-3 h-3" />
+              <Plus className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onChoose(it); }}
-              className="px-3 py-1.5 rounded-lg border bg-indigo-50 hover:bg-indigo-100 text-sm whitespace-nowrap"
+              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold whitespace-nowrap"
               type="button"
             >
-              Use
+              Add to Day
             </button>
           </div>
         </div>
@@ -697,10 +690,10 @@ function MapView({
               )}
               <div className="mt-2">
                 <button
-                  className="px-3 py-1.5 rounded-lg border bg-indigo-50 hover:bg-indigo-100 text-sm"
+                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium"
                   onClick={() => onChoose(items[activeIdx])}
                 >
-                  Use
+                  Add to Day
                 </button>
               </div>
             </div>

@@ -1,5 +1,5 @@
 // src/components/HotelSection.tsx
-import React, { useState } from "react";
+import { useState } from "react";
 import { Search, Crosshair, Hotel } from "lucide-react";
 import { SelectedItem } from "../lib/types";
 
@@ -25,7 +25,6 @@ export default function HotelSection({
   const [results, setResults] = useState<SelectedItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
   async function fetchLocationSuggestions(query: string) {
     if (query.length < 3) return [];
@@ -106,31 +105,35 @@ export default function HotelSection({
     <div className="rounded-2xl bg-white border p-4">
       <div className="font-semibold mb-2 flex items-center gap-2">
         <Hotel className="w-4 h-4" />
-        Trip Location
+        Hotel / Base
       </div>
       <div className="flex flex-wrap items-center gap-3 mb-3">
-        <div className="flex items-center gap-2 border rounded-lg px-2 py-1 w-[320px] bg-white">
-          <Search className="w-4 h-4 text-slate-500" />
+        <div className="flex items-center gap-2 border rounded-lg px-2 py-1 bg-white flex-1 min-w-[220px] max-w-xs">
+          <Search className="w-4 h-4 text-slate-500 flex-shrink-0" />
           <input
             value={query}
             onChange={async (e) => {
               const value = e.target.value;
               setQuery(value);
-              
-              // Only fetch location suggestions, don't auto-search hotels
               const suggestions = await fetchLocationSuggestions(value);
               setSuggestions(suggestions);
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                if (searchTimeout) clearTimeout(searchTimeout);
-                searchHotels(query);
-              }
+              if (e.key === 'Enter') searchHotels(query);
             }}
-            placeholder="Search for hotels/areas or press Enter"
+            placeholder="Search for a hotel or area…"
             className="outline-none w-full text-sm"
+            aria-label="Search hotels or areas"
           />
         </div>
+        <button
+          onClick={() => searchHotels(query)}
+          disabled={loading || query.trim().length < 3}
+          className="px-3 py-2 rounded-lg border bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+          type="button"
+        >
+          {loading ? 'Searching…' : 'Search'}
+        </button>
         <button
           onClick={handleUseMyLocation}
           className="px-3 py-2 rounded-lg border flex items-center gap-2 bg-white hover:bg-slate-50 text-sm"
@@ -149,7 +152,6 @@ export default function HotelSection({
         )}
       </div>
       {error && <div className="text-xs text-amber-700 mb-2">{error}</div>}
-      {loading && <div className="text-xs text-slate-500">Searching…</div>}
       {suggestions.length > 0 && (
         <div className="border rounded-xl p-2 bg-blue-50 mb-2">
           <div className="text-xs text-blue-700 mb-1">Did you mean:</div>
@@ -176,6 +178,7 @@ export default function HotelSection({
               onClick={() => {
                 setHotel(h);
                 setResults([]);
+                setQuery(h.name);
               }}
               className="w-full text-left py-2 px-2 hover:bg-white rounded-lg"
             >
@@ -187,23 +190,20 @@ export default function HotelSection({
           ))}
         </div>
       )}
-      <div className="mt-2 text-sm">
-        Selected:{" "}
-        {hotel ? (
-          <>
-            <span className="font-medium">{hotel.name}</span>
-            {hotel.area ? <span className="text-slate-500"> · {hotel.area}</span> : null}
-            {hotel.lat && hotel.lng ? (
-              <span className="text-slate-400">
-                {" "}
-                ({hotel.lat.toFixed(4)}, {hotel.lng.toFixed(4)})
-              </span>
-            ) : null}
-          </>
-        ) : (
-          <span className="text-slate-400">none</span>
-        )}
-      </div>
+      {hotel && (
+        <div className="mt-2 flex items-center gap-2 text-sm">
+          <span className="text-slate-500">Selected:</span>
+          <span className="font-medium">{hotel.name}</span>
+          {hotel.area && <span className="text-slate-400">· {hotel.area}</span>}
+          <button
+            onClick={() => { setHotel(null); setQuery(""); }}
+            className="ml-auto text-xs text-slate-400 hover:text-rose-500 transition-colors"
+            aria-label="Clear selected hotel"
+          >
+            Clear
+          </button>
+        </div>
+      )}
     </div>
   );
 }

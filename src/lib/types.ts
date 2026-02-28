@@ -23,6 +23,8 @@ export type SelectedItem = {
   desc?: string;
   meta?: string;
   placeId?: string;
+  /** First available photo URL, shown as thumbnail in the planner */
+  photo?: string;
 };
 
 export type DayPlan = {

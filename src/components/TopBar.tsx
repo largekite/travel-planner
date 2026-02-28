@@ -1,13 +1,8 @@
 import React from "react";
-import { Wifi, Heart, Users, Mountain, Calendar } from "lucide-react";
+import { Heart, Users, Mountain, Star, Calendar } from "lucide-react";
 import { VIBES, Vibe } from "../lib/types";
-import AutocompleteInput from "./AutocompleteInput";
-import LocationButton from "./LocationButton";
 
 type Props = {
-  apiOk: boolean | null;
-  apiLatency: number | null;
-  apiMsg: string | null;
   country: string;
   setCountry: (c: string) => void;
   city: string;
@@ -20,10 +15,14 @@ type Props = {
   setCurrentDay: (n: number) => void;
 };
 
+const VIBE_ICONS: Partial<Record<Vibe, React.ElementType>> = {
+  romantic:    Heart,
+  family:      Users,
+  adventurous: Mountain,
+  popular:     Star,
+};
+
 export default function TopBar({
-  apiOk,
-  apiLatency,
-  apiMsg,
   country,
   setCountry,
   city,
@@ -36,89 +35,74 @@ export default function TopBar({
   setCurrentDay,
 }: Props) {
   return (
-    <div className="rounded-2xl bg-white/80 backdrop-blur border p-4 flex flex-wrap items-center gap-3 shadow-sm">
-      <div className="flex items-center gap-2 mr-auto">
-        <div className="text-lg font-semibold tracking-tight">
-          Largekite — {vibe} trip plan
+    <div className="rounded-2xl bg-white/80 backdrop-blur border p-4 shadow-sm space-y-3">
+      {/* Row 1: Title + vibe pills */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="text-lg font-semibold tracking-tight mr-auto">
+          Largekite{city ? ` — ${city}` : ' — Travel Planner'}
         </div>
-        <span
-          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-xs ${
-            apiOk == null
-              ? "bg-slate-50 text-slate-600"
-              : apiOk
-              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-              : "bg-rose-50 text-rose-700 border-rose-200"
-          }`}
-        >
-          <Wifi className="w-3.5 h-3.5" />
-          {apiOk == null
-            ? "API: unknown"
-            : apiOk
-            ? `API: ok${apiLatency != null ? ` · ${apiLatency}ms` : ""}`
-            : `API: down (${apiMsg || "error"})`}
-        </span>
+
+        <div className="flex flex-wrap gap-1.5">
+          {[...new Set(VIBES)].map((v) => {
+            const Icon = VIBE_ICONS[v];
+            return (
+              <button
+                key={v}
+                onClick={() => setVibe(v)}
+                aria-pressed={vibe === v}
+                className={`px-3 py-1.5 rounded-full border text-sm transition-all capitalize flex items-center gap-1 ${
+                  vibe === v
+                    ? "bg-indigo-600 text-white border-indigo-600"
+                    : "bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {Icon && <Icon className="w-3.5 h-3.5" />}
+                {v}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="flex gap-2">
-        {[...new Set(VIBES)].map((v) => (
-          <button
-            key={v}
-            onClick={() => setVibe(v)}
-            aria-pressed={vibe === v}
-            className={`px-3 py-1.5 rounded-full border text-sm transition-all ${
-              vibe === v
-                ? "bg-indigo-600 text-white border-indigo-600"
-                : "bg-white text-slate-800"
-            }`}
-          >
-            {v === "romantic" && <Heart className="inline w-4 h-4 mr-1" />}
-            {v === "family" && <Users className="inline w-4 h-4 mr-1" />}
-            {v === "adventurous" && <Mountain className="inline w-4 h-4 mr-1" />}
-            {v}
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center gap-2 text-sm">
-        <Calendar className="w-4 h-4 text-slate-600" />
-        <span className="text-slate-600">Days</span>
-        <input
-          type="number"
-          min={1}
-          value={daysCount}
-          onChange={(e) => {
-            const value = e.target.value;
-            if (value === '') {
-              // Allow empty input temporarily
-              return;
-            }
-            const numValue = parseInt(value);
-            if (numValue >= 1) {
-              setDaysCount(numValue);
-            }
-          }}
-          onBlur={(e) => {
-            // Set to 1 if empty when losing focus
-            if (e.target.value === '') {
-              setDaysCount(1);
-            }
-          }}
-          className="w-20 border rounded-lg p-1 bg-white"
-        />
-      </div>
-      <div className="flex flex-wrap gap-1 w-full sm:w-auto">
-        {Array.from({ length: daysCount }, (_, i) => i + 1).map((d) => (
-          <button
-            key={d}
-            onClick={() => setCurrentDay(d)}
-            className={`px-3 py-1.5 rounded-lg border text-sm ${
-              currentDay === d
-                ? "bg-indigo-600 text-white border-indigo-600"
-                : "bg-white"
-            }`}
-          >
-            Day {d}
-          </button>
-        ))}
+      {/* Row 2: Days input + day tabs */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 text-sm">
+          <Calendar className="w-4 h-4 text-slate-500" />
+          <span className="text-slate-600 whitespace-nowrap">Days:</span>
+          <input
+            type="number"
+            min={1}
+            value={daysCount}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === '') return;
+              const numValue = parseInt(value);
+              if (numValue >= 1) setDaysCount(numValue);
+            }}
+            onBlur={(e) => {
+              if (e.target.value === '') setDaysCount(1);
+            }}
+            className="w-16 border rounded-lg p-1 bg-white text-center"
+            aria-label="Number of days"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-1">
+          {Array.from({ length: daysCount }, (_, i) => i + 1).map((d) => (
+            <button
+              key={d}
+              onClick={() => setCurrentDay(d)}
+              aria-pressed={currentDay === d}
+              className={`px-3 py-1.5 rounded-lg border text-sm transition-all ${
+                currentDay === d
+                  ? "bg-indigo-600 text-white border-indigo-600"
+                  : "bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              Day {d}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

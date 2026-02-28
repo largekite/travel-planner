@@ -114,23 +114,32 @@ export async function fetchPlaces(
     ? data.results
     : [];
 
-  const items: ApiSuggestion[] = rawItems.map((p: any) => ({
-    name: p.name,
-    url: p.url || p.website,
-    area: p.area || p.vicinity || p.formatted_address,
-    cuisine: p.cuisine,
-    price: p.price,
-    lat: typeof p.lat === "number" ? p.lat : p.geometry?.location?.lat,
-    lng: typeof p.lng === "number" ? p.lng : p.geometry?.location?.lng,
-    desc: p.desc || p.description,
-    meta: p.meta,
-    placeId: p.placeId,
-    ratings: p.ratings
-      ? p.ratings
-      : p.rating
-      ? { google: p.rating, googleReviews: p.user_ratings_total }
-      : undefined,
-  }));
+  const items: ApiSuggestion[] = rawItems.map((p: any) => {
+    // Normalize photos: accept string[] or objects with a url/photo_url field
+    const rawPhotos: any[] = Array.isArray(p.photos) ? p.photos : [];
+    const photos: string[] = rawPhotos
+      .map((ph: any) => (typeof ph === 'string' ? ph : (ph?.url ?? ph?.photo_url ?? null)))
+      .filter(Boolean) as string[];
+
+    return {
+      name: p.name,
+      url: p.url || p.website,
+      area: p.area || p.vicinity || p.formatted_address,
+      cuisine: p.cuisine,
+      price: p.price,
+      lat: typeof p.lat === "number" ? p.lat : p.geometry?.location?.lat,
+      lng: typeof p.lng === "number" ? p.lng : p.geometry?.location?.lng,
+      desc: p.desc || p.description,
+      meta: p.meta,
+      placeId: p.placeId,
+      photos: photos.length ? photos : undefined,
+      ratings: p.ratings
+        ? p.ratings
+        : p.rating
+        ? { google: p.rating, googleReviews: p.user_ratings_total }
+        : undefined,
+    };
+  });
 
   const result = { 
     items, 

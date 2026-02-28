@@ -10,3 +10,11 @@ body {
   @apply bg-slate-100;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
+
+@keyframes toast-enter {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.toast-enter {
+  animation: toast-enter 0.2s ease-out;
+}

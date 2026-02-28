@@ -14,82 +14,69 @@ type Props = {
   onClearSaved?: () => void;
 };
 
+type BtnProps = {
+  onClick: () => void;
+  disabled?: boolean;
+  title: string;
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+};
+
+function ToolbarBtn({ onClick, disabled, title, label, className = '', children }: BtnProps) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${className}`}
+    >
+      {children}
+      <span className="text-[10px] text-slate-500 leading-none">{label}</span>
+    </button>
+  );
+}
+
 export default function QuickActionsToolbar({
-  canUndo,
-  canRedo,
-  onUndo,
-  onRedo,
-  onSave,
-  onShare,
-  onPrint,
-  onExportPDF,
-  onHelp,
-  onClearSaved
+  canUndo, canRedo, onUndo, onRedo, onSave, onShare, onPrint, onExportPDF, onHelp, onClearSaved
 }: Props) {
   return (
-    <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-lg border p-2 flex gap-1 z-50">
-      <button
-        onClick={onUndo}
-        disabled={!canUndo}
-        className="p-2 rounded-full hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
-        title="Undo last change (Ctrl+Z)"
-      >
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white rounded-2xl shadow-lg border px-2 py-1 flex items-end gap-0.5 z-50">
+      <ToolbarBtn onClick={onUndo} disabled={!canUndo} title="Undo last change (Ctrl+Z)" label="Undo">
         <Undo2 className="w-4 h-4" />
-      </button>
-      <button
-        onClick={onRedo}
-        disabled={!canRedo}
-        className="p-2 rounded-full hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
-        title="Redo (Ctrl+Y)"
-      >
+      </ToolbarBtn>
+      <ToolbarBtn onClick={onRedo} disabled={!canRedo} title="Redo (Ctrl+Y)" label="Redo">
         <Redo2 className="w-4 h-4" />
-      </button>
-      <div className="w-px bg-slate-200 mx-1" />
-      <button
-        onClick={onSave}
-        className="p-2 rounded-full hover:bg-slate-100"
-        title="Save to browser (auto-saves every 2 seconds)"
-      >
+      </ToolbarBtn>
+
+      <div className="w-px h-8 bg-slate-200 mx-1 self-center" />
+
+      <ToolbarBtn onClick={onSave} title="Save to browser (auto-saves every 2 sec)" label="Save">
         <Save className="w-4 h-4" />
-      </button>
-      <button
-        onClick={onShare}
-        className="p-2 rounded-full hover:bg-slate-100"
-        title="Share"
-      >
+      </ToolbarBtn>
+      <ToolbarBtn onClick={onShare} title="Share itinerary" label="Share">
         <Share2 className="w-4 h-4" />
-      </button>
-      <button
-        onClick={onPrint}
-        className="p-2 rounded-full hover:bg-slate-100"
-        title="Print (Ctrl+P)"
-      >
+      </ToolbarBtn>
+      <ToolbarBtn onClick={onPrint} title="Print (Ctrl+P)" label="Print">
         <Printer className="w-4 h-4" />
-      </button>
+      </ToolbarBtn>
       {onExportPDF && (
-        <button
-          onClick={onExportPDF}
-          className="p-2 rounded-full hover:bg-slate-100"
-          title="Export as PDF"
-        >
-          <FileDown className="w-4 h-4 text-kite-blue" />
-        </button>
+        <ToolbarBtn onClick={onExportPDF} title="Export as PDF" label="PDF">
+          <FileDown className="w-4 h-4 text-indigo-600" />
+        </ToolbarBtn>
       )}
-      <button
-        onClick={onHelp}
-        className="p-2 rounded-full hover:bg-slate-100"
-        title="Help"
-      >
+      <ToolbarBtn onClick={onHelp} title="Help" label="Help">
         <HelpCircle className="w-4 h-4" />
-      </button>
+      </ToolbarBtn>
+
       {onClearSaved && (
-        <button
-          onClick={onClearSaved}
-          className="p-2 rounded-full hover:bg-slate-100"
-          title="Clear saved data"
-        >
-          <Trash2 className="w-4 h-4 text-rose-600" />
-        </button>
+        <>
+          <div className="w-px h-8 bg-slate-200 mx-1 self-center" />
+          <ToolbarBtn onClick={onClearSaved} title="Clear all saved data and reset" label="Reset" className="hover:bg-rose-50">
+            <Trash2 className="w-4 h-4 text-rose-500" />
+          </ToolbarBtn>
+        </>
       )}
     </div>
   );
