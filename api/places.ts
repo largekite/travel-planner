@@ -31,6 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const city = ((req.query.city as string) || "").trim();
   const slot = ((req.query.slot as string) || "activity").trim();
   const vibe = ((req.query.vibe as string) || "romantic").trim();
+  const budget = ((req.query.budget as string) || "moderate").trim();
   const area = ((req.query.area as string) || (req.query.q as string) || "").trim();
   const near = (req.query.near as string) === "true";
   const mode = ((req.query.mode as string) || "walk").toLowerCase();
@@ -40,6 +41,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const limit = Math.min(Number(req.query.limit || 10), 20); // Cap at 20 for performance
   const page = Number(req.query.page || 1);
   const offset = (page - 1) * limit;
+
+  // Map budget to Google Places price_level range (0-4)
+  const budgetToPriceLevel: Record<string, { min: number; max: number }> = {
+    budget: { min: 0, max: 2 },     // $ to $$
+    moderate: { min: 1, max: 3 },   // $$ to $$$
+    luxury: { min: 3, max: 4 },     // $$$ to $$$$
+  };
+  const priceRange = budgetToPriceLevel[budget] || budgetToPriceLevel.moderate;
 
   const slotToQuery: Record<string, string> = {
     breakfast: "breakfast",
@@ -71,11 +80,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const keywordParts = [slot, vibe, locationHint].filter(Boolean);
       url.searchParams.set("keyword", keywordParts.join(" "));
       url.searchParams.set("key", googleKey);
+      // Google Places API supports minprice and maxprice for nearby search
+      url.searchParams.set("minprice", String(priceRange.min));
+      url.searchParams.set("maxprice", String(priceRange.max));
       if (pageToken) url.searchParams.set("pagetoken", pageToken);
       return url.toString();
     } else {
       const url = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
-      const queryParts = vibe === "popular" 
+      const queryParts = vibe === "popular"
         ? [slot, googleType, locationHint].filter(Boolean)
         : [slot, googleType, vibe, locationHint].filter(Boolean);
       url.searchParams.set("query", queryParts.join(" "));
@@ -89,12 +101,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const url = buildUrl(page > 1 ? req.query.pageToken as string : undefined);
     const r = await fetch(url);
     const data = await r.json();
-    
+
     if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
       rawError = data;
     }
     places = Array.isArray(data.results) ? data.results : [];
     nextPageToken = data.next_page_token || null;
+
+    // For text search, filter by price range post-fetch (API doesn't support price filtering)
+    if (!useNearby) {
+      places = places.filter(p => {
+        if (p.price_level == null) return true; // Include if no price data
+        return p.price_level >= priceRange.min && p.price_level <= priceRange.max;
+      });
+    }
   } catch (e: any) {
     return res.status(500).json({
       error: "google fetch failed",
@@ -177,6 +197,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       lng: loc?.lng,
       meta: useNearby ? `within ~${maxMins} min ${mode}` : undefined,
       placeId: p.place_id,
+      priceLevel: p.price_level,
       ratings: {
         google: p.rating,
         googleReviews: p.user_ratings_total,

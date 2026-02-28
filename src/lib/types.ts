@@ -1,6 +1,17 @@
 export const VIBES = ["popular", "romantic", "family", "adventurous"] as const;
 export type Vibe = (typeof VIBES)[number];
 
+export const BUDGETS = ["budget", "moderate", "luxury"] as const;
+export type Budget = (typeof BUDGETS)[number];
+
+// Vibe-specific keyword priorities for enhanced search
+export const VIBE_PRIORITIES = {
+  adventurous: ['outdoor', 'hiking', 'adventure', 'active', 'sports', 'nature'],
+  family: ['family-friendly', 'kid', 'children', 'park', 'educational', 'fun'],
+  romantic: ['romantic', 'intimate', 'cozy', 'wine', 'sunset', 'couples'],
+  popular: ['popular', 'must-visit', 'famous', 'iconic', 'landmark', 'trending'],
+} as const;
+
 export type SelectedItem = {
   name: string;
   url?: string;
@@ -12,6 +23,8 @@ export type SelectedItem = {
   desc?: string;
   meta?: string;
   placeId?: string;
+  /** First available photo URL, shown as thumbnail in the planner */
+  photo?: string;
 };
 
 export type DayPlan = {
@@ -52,6 +65,8 @@ export type ApiSuggestion = {
   phone?: string;
   website?: string;
   placeId?: string;
+  priceLevel?: number; // Google Places price_level (0-4)
+  budgetLevel?: Budget; // Computed budget category
 };
 
 export type DirectionsSegment = {

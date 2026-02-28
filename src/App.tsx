@@ -1,35 +1,37 @@
-import React, { useEffect, useState } from "react";
-import { Printer, Share2, WifiOff } from "lucide-react";
+import { useEffect, useState } from "react";
+import { WifiOff } from "lucide-react";
+import Toast, { type ToastData } from "./components/Toast";
 import { useSwipeable } from 'react-swipeable';
 import TopBar from "./components/TopBar";
 import HotelSection from "./components/HotelSection";
-import DayPlanner from "./components/DayPlanner";
 import SuggestionModal from "./components/SuggestionModal";
 import MapPanel from "./components/MapPanel";
+import HeroImage from "./components/HeroImage";
+import Footer from "./components/Footer";
+import ViewToggle from "./components/ViewToggle";
 import {
   DayPlan,
   SelectedItem,
   SlotKey,
   Vibe,
+  Budget,
   ApiSuggestion,
   DirectionsSegment,
 } from "./lib/types";
 import {
-  fetchPlaces,
   fetchAllPlaces,
   fetchDayNotes,
   fetchDirections,
   detectApiBase,
 } from "./lib/api";
 import { optimizeRoute, calculateRouteTotals } from "./lib/routeOptimizer";
-import LocationButton from "./components/LocationButton";
+import PDFExportModal from "./components/PDFExportModal";
 import ErrorBoundary from "./components/ErrorBoundary";
 import PlaceDetails from "./components/PlaceDetails";
 import QuickActionsToolbar from "./components/QuickActionsToolbar";
 import SmartDefaults from "./components/SmartDefaults";
 import DragDropDayPlanner from "./components/DragDropDayPlanner";
 import ProgressIndicator from "./components/ProgressIndicator";
-import Tooltip from "./components/Tooltip";
 import { useHistory } from "./hooks/useHistory";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useOnline } from "./hooks/useOnline";
@@ -65,11 +67,7 @@ export default function App() {
 
   // global trip state with history
   const [country, setCountry] = useState("USA");
-  const [city, setCity] = useState(() => {
-    const saved = localStorage.getItem('travel-city');
-    // Return empty string if not found, will show Quick Start
-    return saved || "";
-  });
+  const [city, setCity] = useState("");
   const [vibe, setVibe] = useState<Vibe>(() => {
     // Only restore vibe if saved-plan exists
     const saved = localStorage.getItem('saved-plan');
@@ -92,41 +90,23 @@ export default function App() {
     return 3;
   });
   const [currentDay, setCurrentDay] = useState(1);
+  const [budget, setBudget] = useState<Budget>('moderate');
+  const [mobileView, setMobileView] = useState<'list' | 'map'>('list');
   
   // Load saved plan from localStorage
-  const getInitialPlan = (): DayPlan[] => {
-    const saved = localStorage.getItem('saved-plan');
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        return data.plan || Array.from({ length: 3 }, () => ({}));
-      } catch {}
-    }
-    return Array.from({ length: 3 }, () => ({}));
-  };
-  
-  const planHistory = useHistory<DayPlan[]>(getInitialPlan());
+  const planHistory = useHistory<DayPlan[]>(Array.from({ length: 3 }, () => ({} as DayPlan)));
   const plan = planHistory.currentState;
   const setPlan = planHistory.pushState;
   
   // hotel / center
-  const [hotel, setHotel] = useState<SelectedItem | null>(() => {
-    const saved = localStorage.getItem('saved-plan');
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        return data.hotel || null;
-      } catch {}
-    }
-    return null;
-  });
+  const [hotel, setHotel] = useState<SelectedItem | null>(null);
   
   // UI state
   const [showSmartDefaults, setShowSmartDefaults] = useState(!city || city === "");
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [retryCount, setRetryCount] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
   const [showSampleItinerary, setShowSampleItinerary] = useState(false);
+  const [showPDFModal, setShowPDFModal] = useState(false);
   
   // Online status
   const isOnline = useOnline();
@@ -160,10 +140,10 @@ export default function App() {
   const [detailItem, setDetailItem] = useState<SelectedItem | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // API status
-  const [apiOk, setApiOk] = useState<boolean | null>(null);
-  const [apiLatency, setApiLatency] = useState<number | null>(null);
-  const [apiMsg, setApiMsg] = useState<string | null>(null);
+  // Toast notifications
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const showToast = (message: string, type: ToastData['type'] = 'success') =>
+    setToast({ message, type });
   
   // Swipe gestures for mobile
   const swipeHandlers = useSwipeable({
@@ -196,41 +176,6 @@ export default function App() {
     Boolean
   ) as SelectedItem[];
 
-  // ping API so top bar shows status
-  useEffect(() => {
-    if (!API_BASE) {
-      setApiOk(null);
-      setApiMsg("API base not configured");
-      return;
-    }
-    let cancelled = false;
-    const ping = async () => {
-      const start = performance.now();
-      try {
-        const r = await fetch(
-          `${API_BASE}/api/places?health=1`
-        );
-        const latency = Math.round(performance.now() - start);
-        if (!cancelled) {
-          setApiLatency(latency);
-          setApiOk(r.ok);
-          setApiMsg(r.ok ? "OK" : `HTTP ${r.status}`);
-        }
-      } catch (e: any) {
-        if (!cancelled) {
-          setApiOk(false);
-          setApiLatency(null);
-          setApiMsg(String(e?.message || "error"));
-        }
-      }
-    };
-    ping();
-    const id = setInterval(ping, 60000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [API_BASE]);
 
   // directions fetch
   useEffect(() => {
@@ -271,6 +216,7 @@ export default function App() {
       lng: item.lng,
       desc: item.desc,
       meta: item.meta,
+      photo: item.photos?.[0],
     };
 
     // 1) set the slot
@@ -330,6 +276,7 @@ useEffect(() => {
     vibe,
     slot: slotKey,
     limit: "10",
+    budget,
     near: String(useNearFilter),
     mode: nearMode,
     maxMins: String(nearMaxMins),
@@ -342,7 +289,7 @@ useEffect(() => {
   });
 
   fetchAllPlaces(API_BASE, params, 2, ctrl.signal)
-    .then(({ items, raw }) => {
+    .then(({ items }) => {
       setLiveItems(items);
       setLiveError(null);
       setLastFetchUrl(`${API_BASE}/api/places?${params.toString()}`);
@@ -362,6 +309,7 @@ useEffect(() => {
   city,
   vibe,
   slotKey,
+  budget,
   useNearFilter,
   nearMode,
   nearMaxMins,
@@ -372,17 +320,13 @@ useEffect(() => {
 ]);
 
 
-  function clearDay(dayIndex1Based: number) {
-    const next = plan.map((d: DayPlan) => ({ ...d }));
-    next[dayIndex1Based - 1] = {} as DayPlan;
-    setPlan(next);
-  }
 
   // Enhanced actions
-  const handleSave = () => {
+  const handleSave = (silent = false) => {
     const planData = { plan, city, vibe, daysCount, hotel };
     localStorage.setItem('saved-plan', JSON.stringify(planData));
     localStorage.setItem('travel-city', city);
+    if (!silent) showToast('Plan saved!');
   };
 
   // Clear saved data and reset app state to defaults
@@ -430,7 +374,7 @@ useEffect(() => {
     } else {
       // Copy detailed itinerary to clipboard
       navigator.clipboard.writeText(shareText);
-      alert('Itinerary copied to clipboard!');
+      showToast('Itinerary copied to clipboard!', 'info');
     }
   };
   
@@ -500,16 +444,17 @@ useEffect(() => {
   };
   
   const handleAutoFill = async () => {
-    if (!API_BASE) return;
-    
-    setLoadingProgress(0);
+    if (!API_BASE) { showToast('API not available', 'error'); return; }
+    if (!city) { showToast('Pick a city first', 'error'); return; }
+
+    setLoadingProgress(10);
     const slots = ['hotel', 'breakfast', 'activity', 'activity2', 'lunch', 'coffee', 'dinner'];
-    
+
     try {
       // Fetch more options to avoid duplicates
       const promises = slots.map(slot => {
         const params = new URLSearchParams({
-          city, vibe, slot, limit: "5"
+          city, vibe, slot, limit: "5", budget
         });
         return fetchAllPlaces(API_BASE, params, 1).then(result => ({ slot, items: result.items }));
       });
@@ -546,7 +491,8 @@ useEffect(() => {
       
       setPlan(newPlan);
       setLoadingProgress(100);
-      
+      showToast('Day auto-filled!');
+
       // Generate notes for the auto-filled day
       const dayIdx = currentDay;
       const snapshot = cloneDay(newPlan[dayIdx - 1]);
@@ -564,6 +510,7 @@ useEffect(() => {
         });
     } catch (error) {
       console.error('Auto-fill failed:', error);
+      showToast('Auto-fill failed — check API connection', 'error');
     }
     
     setTimeout(() => setLoadingProgress(0), 1000);
@@ -573,21 +520,21 @@ useEffect(() => {
   useKeyboard({
     z: planHistory.undo,
     y: planHistory.redo,
-    s: handleSave,
+    s: () => handleSave(false),
     p: handlePrint
   });
 
 
   
-  // Auto-save
+  // Auto-save (silent)
   useEffect(() => {
-    const timer = setTimeout(handleSave, 2000);
+    const timer = setTimeout(() => handleSave(true), 2000);
     return () => clearTimeout(timer);
   }, [plan, city, vibe, hotel]);
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-gradient-to-b from-sky-50 via-indigo-50 to-white p-6" {...swipeHandlers}>
+      <div className="min-h-screen bg-gradient-to-b from-sky-50 via-indigo-50 to-white p-6 pb-24" {...swipeHandlers}>
         {/* Offline indicator */}
         {!isOnline && (
           <div className="fixed top-4 right-4 bg-amber-100 border border-amber-300 rounded-lg p-3 flex items-center gap-2 z-50">
@@ -608,9 +555,6 @@ useEffect(() => {
         
         <div className="max-w-6xl mx-auto space-y-5">
         <TopBar
-          apiOk={apiOk}
-          apiLatency={apiLatency}
-          apiMsg={apiMsg}
           country={country}
           setCountry={setCountry}
           city={city}
@@ -625,7 +569,10 @@ useEffect(() => {
           currentDay={currentDay}
           setCurrentDay={setCurrentDay}
         />
-        
+
+        {/* Hero Image */}
+        {city && <HeroImage city={city} />}
+
         {/* Smart Defaults */}
         {showSmartDefaults && (
           <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm">
@@ -641,6 +588,8 @@ useEffect(() => {
             <SmartDefaults
               onCitySelect={(newCity) => {
                 setCity(newCity);
+                setHotel(null);
+                setPlan(Array.from({ length: daysCount }, () => ({} as DayPlan)));
                 setShowSmartDefaults(false);
               }}
               onVibeSelect={setVibe}
@@ -738,9 +687,6 @@ useEffect(() => {
                   
                   <button
                     onClick={() => {
-                      const confirmMsg = `Replace your day's itinerary with this order?\n\nBreakfast: ${uniqueItems[0]?.name || 'TBD'}\nMorning Activity: ${uniqueItems[1]?.name || 'TBD'}\nLunch: ${uniqueItems[2]?.name || 'TBD'}\nCoffee: ${uniqueItems[3]?.name || 'TBD'}\nDinner: ${uniqueItems[4]?.name || 'TBD'}\n\n(Hotel stays as ${hotel?.name || 'TBD'})`;
-                      if (!window.confirm(confirmMsg)) return;
-
                       // Apply optimization to current day
                       const dayData = { ...currentDayData };
                       const slots = ['breakfast', 'activity', 'lunch', 'coffee', 'dinner'] as const;
@@ -758,12 +704,12 @@ useEffect(() => {
                       const next = [...plan];
                       next[currentDay - 1] = dayData;
                       setPlan(next);
-                      
                       setShowOptimization(false);
+                      showToast('Route applied! Press Ctrl+Z to undo.', 'info');
                     }}
                     className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
                   >
-                    Use Suggested Order
+                    Apply Suggested Order
                   </button>
                 </div>
               );
@@ -772,7 +718,7 @@ useEffect(() => {
         )}
 
         <div className="grid lg:grid-cols-2 gap-5">
-          <div className="space-y-4">
+          <div className={`space-y-4 ${mobileView === 'map' ? 'hidden lg:block' : ''}`}>
             <DragDropDayPlanner
               currentDay={currentDay}
               plan={plan}
@@ -780,24 +726,31 @@ useEffect(() => {
               openSlot={(slot: string) => openSlot(slot as SlotKey)}
               onAutoFill={handleAutoFill}
               loadingProgress={loadingProgress}
+              city={city}
+              vibe={vibe}
             />
-            
+
           </div>
 
-          <MapPanel
-            currentDay={currentDay}
-            city={city}
-            hotel={hotel}
-            chosenItems={chosenItems}
-            dirSegs={dirSegs}
-            dirErr={dirErr}
-            onItemClick={(item) => {
-              // Open details modal for the clicked item
-              setDetailItem(item);
-              setShowDetailModal(true);
-            }}
-          />
+          <div className={`${mobileView === 'list' ? 'hidden lg:block' : ''}`}>
+            <MapPanel
+              currentDay={currentDay}
+              city={city}
+              hotel={hotel}
+              chosenItems={chosenItems}
+              dirSegs={dirSegs}
+              dirErr={dirErr}
+              onItemClick={(item) => {
+                // Open details modal for the clicked item
+                setDetailItem(item);
+                setShowDetailModal(true);
+              }}
+            />
+          </div>
         </div>
+
+        {/* Mobile View Toggle */}
+        <ViewToggle view={mobileView} onViewChange={setMobileView} />
 
         {/* Plan view */}
         <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm" data-print-section>
@@ -875,6 +828,8 @@ useEffect(() => {
           setSortMode={setSortMode}
           lastFetchUrl={lastFetchUrl}
           lastResultCount={lastResultCount}
+          budget={budget}
+          setBudget={setBudget}
         />
         
         {/* Quick Actions Toolbar */}
@@ -886,6 +841,7 @@ useEffect(() => {
           onSave={handleSave}
           onShare={handleShare}
           onPrint={handlePrint}
+          onExportPDF={() => setShowPDFModal(true)}
           onHelp={() => setShowHelp(true)}
           onClearSaved={handleClearSaved}
         />
@@ -900,7 +856,9 @@ useEffect(() => {
             onApplyPlan={(newPlan) => {
               setPlan(newPlan);
               setShowSampleItinerary(false);
+              showToast('Sample itinerary applied!');
             }}
+            onToast={(msg) => showToast(msg, 'info')}
           />
         )}
         
@@ -928,7 +886,7 @@ useEffect(() => {
         
         {/* Place details modal from map click */}
         {showDetailModal && detailItem && (
-          <PlaceDetails 
+          <PlaceDetails
             place={detailItem}
             onClose={() => {
               setShowDetailModal(false);
@@ -936,9 +894,32 @@ useEffect(() => {
             }}
           />
         )}
-        
+
         </div>
+
+        {/* Footer */}
+        <Footer />
       </div>
+
+      {/* PDF Export Modal */}
+      {showPDFModal && (
+        <PDFExportModal
+          plan={plan}
+          city={city}
+          vibe={vibe}
+          onClose={() => setShowPDFModal(false)}
+          onToast={(msg, type) => showToast(msg, type)}
+        />
+      )}
+
+      {/* Toast notifications */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onDismiss={() => setToast(null)}
+        />
+      )}
     </ErrorBoundary>
   );
 }

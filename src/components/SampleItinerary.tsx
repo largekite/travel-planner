@@ -9,6 +9,7 @@ type Props = {
   daysCount: number;
   onClose: () => void;
   onApplyPlan: (plan: DayPlan[]) => void;
+  onToast?: (msg: string) => void;
 };
 
 type SampleDay = {
@@ -23,7 +24,7 @@ type SampleDay = {
   notes: string;
 };
 
-export default function SampleItinerary({ city, vibe, daysCount, onClose, onApplyPlan }: Props) {
+export default function SampleItinerary({ city, vibe, daysCount, onClose, onApplyPlan, onToast }: Props) {
   const [samplePlan, setSamplePlan] = useState<SampleDay[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -246,7 +247,7 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
       });
     } else {
       navigator.clipboard.writeText(text);
-      alert('Itinerary copied to clipboard!');
+      onToast?.('Itinerary copied to clipboard!');
     }
   };
 
