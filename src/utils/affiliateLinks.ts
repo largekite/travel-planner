@@ -17,7 +17,7 @@ export function generateBookingLink(
   const baseUrl = 'https://www.booking.com/searchresults.html';
   const params = new URLSearchParams({
     ss: hotelName ? `${hotelName}, ${cityName}` : cityName,
-    aid: process.env.BOOKING_AFFILIATE_ID || '1', // Placeholder affiliate ID
+    aid: import.meta.env.VITE_BOOKING_AFFILIATE_ID || '1', // Placeholder affiliate ID
   });
 
   if (checkIn) params.set('checkin', checkIn);
@@ -39,7 +39,7 @@ export function generateViatorLink(
   const baseUrl = 'https://www.viator.com/searchResults/all';
   const params = new URLSearchParams({
     text: `${activityName} ${cityName}`,
-    pid: process.env.VIATOR_PARTNER_ID || '1', // Placeholder partner ID
+    pid: import.meta.env.VITE_VIATOR_PARTNER_ID || '1', // Placeholder partner ID
   });
 
   return `${baseUrl}?${params.toString()}`;
@@ -56,6 +56,6 @@ export function generateGetYourGuideLink(
   activityName: string
 ): string {
   const searchQuery = `${activityName} ${cityName}`.replace(/\s+/g, '-');
-  const partnerId = process.env.GETYOURGUIDE_PARTNER_ID || '1'; // Placeholder
+  const partnerId = import.meta.env.VITE_GETYOURGUIDE_PARTNER_ID || '1'; // Placeholder
   return `https://www.getyourguide.com/s/?q=${encodeURIComponent(searchQuery)}&partner_id=${partnerId}`;
 }

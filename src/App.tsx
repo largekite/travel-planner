@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { WifiOff } from "lucide-react";
 import Toast, { type ToastData } from "./components/Toast";
 import { useSwipeable } from 'react-swipeable';
 import TopBar from "./components/TopBar";
 import HotelSection from "./components/HotelSection";
-import DayPlanner from "./components/DayPlanner";
 import SuggestionModal from "./components/SuggestionModal";
 import MapPanel from "./components/MapPanel";
 import HeroImage from "./components/HeroImage";
@@ -20,7 +19,6 @@ import {
   DirectionsSegment,
 } from "./lib/types";
 import {
-  fetchPlaces,
   fetchAllPlaces,
   fetchDayNotes,
   fetchDirections,
@@ -28,14 +26,12 @@ import {
 } from "./lib/api";
 import { optimizeRoute, calculateRouteTotals } from "./lib/routeOptimizer";
 import PDFExportModal from "./components/PDFExportModal";
-import LocationButton from "./components/LocationButton";
 import ErrorBoundary from "./components/ErrorBoundary";
 import PlaceDetails from "./components/PlaceDetails";
 import QuickActionsToolbar from "./components/QuickActionsToolbar";
 import SmartDefaults from "./components/SmartDefaults";
 import DragDropDayPlanner from "./components/DragDropDayPlanner";
 import ProgressIndicator from "./components/ProgressIndicator";
-import Tooltip from "./components/Tooltip";
 import { useHistory } from "./hooks/useHistory";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useOnline } from "./hooks/useOnline";
@@ -71,11 +67,7 @@ export default function App() {
 
   // global trip state with history
   const [country, setCountry] = useState("USA");
-  const [city, setCity] = useState(() => {
-    const saved = localStorage.getItem('travel-city');
-    // Return empty string if not found, will show Quick Start
-    return saved || "";
-  });
+  const [city, setCity] = useState("");
   const [vibe, setVibe] = useState<Vibe>(() => {
     // Only restore vibe if saved-plan exists
     const saved = localStorage.getItem('saved-plan');
@@ -102,37 +94,16 @@ export default function App() {
   const [mobileView, setMobileView] = useState<'list' | 'map'>('list');
   
   // Load saved plan from localStorage
-  const getInitialPlan = (): DayPlan[] => {
-    const saved = localStorage.getItem('saved-plan');
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        return data.plan || Array.from({ length: 3 }, () => ({}));
-      } catch {}
-    }
-    return Array.from({ length: 3 }, () => ({}));
-  };
-  
-  const planHistory = useHistory<DayPlan[]>(getInitialPlan());
+  const planHistory = useHistory<DayPlan[]>(Array.from({ length: 3 }, () => ({} as DayPlan)));
   const plan = planHistory.currentState;
   const setPlan = planHistory.pushState;
   
   // hotel / center
-  const [hotel, setHotel] = useState<SelectedItem | null>(() => {
-    const saved = localStorage.getItem('saved-plan');
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        return data.hotel || null;
-      } catch {}
-    }
-    return null;
-  });
+  const [hotel, setHotel] = useState<SelectedItem | null>(null);
   
   // UI state
   const [showSmartDefaults, setShowSmartDefaults] = useState(!city || city === "");
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [retryCount, setRetryCount] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
   const [showSampleItinerary, setShowSampleItinerary] = useState(false);
   const [showPDFModal, setShowPDFModal] = useState(false);
@@ -318,7 +289,7 @@ useEffect(() => {
   });
 
   fetchAllPlaces(API_BASE, params, 2, ctrl.signal)
-    .then(({ items, raw }) => {
+    .then(({ items }) => {
       setLiveItems(items);
       setLiveError(null);
       setLastFetchUrl(`${API_BASE}/api/places?${params.toString()}`);
@@ -349,11 +320,6 @@ useEffect(() => {
 ]);
 
 
-  function clearDay(dayIndex1Based: number) {
-    const next = plan.map((d: DayPlan) => ({ ...d }));
-    next[dayIndex1Based - 1] = {} as DayPlan;
-    setPlan(next);
-  }
 
   // Enhanced actions
   const handleSave = (silent = false) => {
@@ -622,6 +588,8 @@ useEffect(() => {
             <SmartDefaults
               onCitySelect={(newCity) => {
                 setCity(newCity);
+                setHotel(null);
+                setPlan(Array.from({ length: daysCount }, () => ({} as DayPlan)));
                 setShowSmartDefaults(false);
               }}
               onVibeSelect={setVibe}
