@@ -10,14 +10,12 @@ export function generateHotelsLink(
   cityName: string,
   hotelName?: string
 ): string {
-  const query = hotelName ? `${hotelName} ${cityName}` : cityName;
-  const params = new URLSearchParams({
-    q: query,
-    affiliateId: import.meta.env.VITE_HOTELS_AFFILIATE_ID || '',
-  });
-  if (!import.meta.env.VITE_HOTELS_AFFILIATE_ID) params.delete('affiliateId');
+  const destination = hotelName ? `${hotelName}, ${cityName}` : cityName;
+  const params = new URLSearchParams({ destination });
+  const affiliateId = import.meta.env.VITE_HOTELS_AFFILIATE_ID;
+  if (affiliateId) params.set('affiliateId', affiliateId);
 
-  return `https://www.hotels.com/search.do?${params.toString()}`;
+  return `https://www.hotels.com/Hotel-Search?${params.toString()}`;
 }
 
 /**
