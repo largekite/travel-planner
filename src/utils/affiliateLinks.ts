@@ -1,29 +1,42 @@
 // Utility functions for generating affiliate links
 
 /**
- * Generate Booking.com affiliate link for hotel search
+ * Generate Hotels.com affiliate link for hotel search
  * @param cityName - Destination city
  * @param hotelName - Optional specific hotel name
- * @param checkIn - Optional check-in date (YYYY-MM-DD)
- * @param checkOut - Optional check-out date (YYYY-MM-DD)
- * @returns Booking.com search URL with affiliate tracking
+ * @returns Hotels.com search URL with affiliate tracking
  */
-export function generateBookingLink(
+export function generateHotelsLink(
   cityName: string,
-  hotelName?: string,
-  checkIn?: string,
-  checkOut?: string
+  hotelName?: string
 ): string {
-  const baseUrl = 'https://www.booking.com/searchresults.html';
+  const query = hotelName ? `${hotelName} ${cityName}` : cityName;
   const params = new URLSearchParams({
-    ss: hotelName ? `${hotelName}, ${cityName}` : cityName,
-    aid: import.meta.env.VITE_BOOKING_AFFILIATE_ID || '1', // Placeholder affiliate ID
+    q: query,
+    affiliateId: import.meta.env.VITE_HOTELS_AFFILIATE_ID || '',
   });
+  if (!import.meta.env.VITE_HOTELS_AFFILIATE_ID) params.delete('affiliateId');
 
-  if (checkIn) params.set('checkin', checkIn);
-  if (checkOut) params.set('checkout', checkOut);
+  return `https://www.hotels.com/search.do?${params.toString()}`;
+}
 
-  return `${baseUrl}?${params.toString()}`;
+/**
+ * Generate TripAdvisor affiliate link for restaurant/attraction search
+ * @param cityName - Destination city
+ * @param placeName - Restaurant or attraction name
+ * @returns TripAdvisor search URL with affiliate tracking
+ */
+export function generateTripAdvisorLink(
+  cityName: string,
+  placeName: string
+): string {
+  const params = new URLSearchParams({
+    q: `${placeName} ${cityName}`,
+  });
+  const partnerId = import.meta.env.VITE_TRIPADVISOR_PARTNER_ID;
+  if (partnerId) params.set('m', partnerId);
+
+  return `https://www.tripadvisor.com/Search?${params.toString()}`;
 }
 
 /**
@@ -36,13 +49,11 @@ export function generateViatorLink(
   cityName: string,
   activityName: string
 ): string {
-  const baseUrl = 'https://www.viator.com/searchResults/all';
-  const params = new URLSearchParams({
-    text: `${activityName} ${cityName}`,
-    pid: import.meta.env.VITE_VIATOR_PARTNER_ID || '1', // Placeholder partner ID
-  });
+  const params = new URLSearchParams({ text: `${activityName} ${cityName}` });
+  const partnerId = import.meta.env.VITE_VIATOR_PARTNER_ID;
+  if (partnerId) params.set('pid', partnerId);
 
-  return `${baseUrl}?${params.toString()}`;
+  return `https://www.viator.com/searchResults/all?${params.toString()}`;
 }
 
 /**

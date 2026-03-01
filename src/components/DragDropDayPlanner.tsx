@@ -6,7 +6,7 @@ import PlaceDetails from './PlaceDetails';
 import AffiliateButton from './AffiliateButton';
 import RegenerateButton from './RegenerateButton';
 import { getSlotIcon } from '../utils/slotIcons';
-import { generateBookingLink, generateViatorLink } from '../utils/affiliateLinks';
+import { generateHotelsLink, generateViatorLink, generateTripAdvisorLink } from '../utils/affiliateLinks';
 
 type Props = {
   currentDay: number;
@@ -126,6 +126,7 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
           {items.map((item) => {
             const isHotel = item.slot === 'hotel';
             const isActivity = item.slot === 'activity' || item.slot === 'activity2';
+            const isFood = item.slot === 'breakfast' || item.slot === 'lunch' || item.slot === 'dinner' || item.slot === 'coffee';
 
             return (
               <div key={item.id} className="relative flex items-center gap-3 p-4 rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
@@ -172,10 +173,13 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
                 {/* Action buttons */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {isHotel && item.item && city && (
-                    <AffiliateButton type="hotel" href={generateBookingLink(city, item.item.name)} />
+                    <AffiliateButton type="hotel" href={generateHotelsLink(city, item.item.name)} />
                   )}
                   {isActivity && item.item && city && (
                     <AffiliateButton type="activity" href={generateViatorLink(city, item.item.name)} />
+                  )}
+                  {isFood && item.item && city && (
+                    <AffiliateButton type="activity" href={generateTripAdvisorLink(city, item.item.name)} label="TripAdvisor" />
                   )}
                   <RegenerateButton onRegenerate={() => handleRegenerate(item.slot)} />
                   <button
