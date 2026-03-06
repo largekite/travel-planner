@@ -11,11 +11,16 @@ export function generateHotelsLink(
   hotelName?: string
 ): string {
   const destination = hotelName ? `${hotelName}, ${cityName}` : cityName;
-  const params = new URLSearchParams({ destination });
-  const affiliateId = import.meta.env.VITE_HOTELS_AFFILIATE_ID;
-  if (affiliateId) params.set('affiliateId', affiliateId);
+  const hotelsUrl = `https://www.hotels.com/Hotel-Search?destination=${encodeURIComponent(destination)}`;
 
-  return `https://www.hotels.com/Hotel-Search?${params.toString()}`;
+  const cjPid = import.meta.env.VITE_CJ_PID;
+  const cjAid = import.meta.env.VITE_CJ_HOTELS_AID;
+  if (cjPid && cjAid) {
+    const domain = import.meta.env.VITE_CJ_DOMAIN || 'www.dpbolvw.net';
+    return `https://${domain}/click-${cjPid}-${cjAid}?url=${encodeURIComponent(hotelsUrl)}`;
+  }
+
+  return hotelsUrl;
 }
 
 /**
