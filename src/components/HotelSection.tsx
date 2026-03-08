@@ -1,6 +1,6 @@
 // src/components/HotelSection.tsx
 import { useState } from "react";
-import { Search, Crosshair, Hotel } from "lucide-react";
+import { Search, Crosshair, Hotel, Copy } from "lucide-react";
 import { SelectedItem } from "../lib/types";
 
 type Props = {
@@ -10,6 +10,7 @@ type Props = {
   setCity: (city: string) => void;
   apiBase: string;
   onSampleItinerary?: () => void;
+  onUseForAllDays?: (hotel: SelectedItem) => void;
 };
 
 export default function HotelSection({
@@ -19,6 +20,7 @@ export default function HotelSection({
   setCity,
   apiBase,
   onSampleItinerary,
+  onUseForAllDays,
 }: Props) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -195,13 +197,25 @@ export default function HotelSection({
           <span className="text-slate-500">Selected:</span>
           <span className="font-medium">{hotel.name}</span>
           {hotel.area && <span className="text-slate-400">· {hotel.area}</span>}
-          <button
-            onClick={() => { setHotel(null); setQuery(""); }}
-            className="ml-auto text-xs text-slate-400 hover:text-rose-500 transition-colors"
-            aria-label="Clear selected hotel"
-          >
-            Clear
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            {onUseForAllDays && (
+              <button
+                onClick={() => onUseForAllDays(hotel)}
+                className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors"
+                aria-label="Use this hotel for all days"
+              >
+                <Copy className="w-3 h-3" />
+                All days
+              </button>
+            )}
+            <button
+              onClick={() => { setHotel(null); setQuery(""); }}
+              className="text-xs text-slate-400 hover:text-rose-500 transition-colors"
+              aria-label="Clear selected hotel"
+            >
+              Clear
+            </button>
+          </div>
         </div>
       )}
     </div>

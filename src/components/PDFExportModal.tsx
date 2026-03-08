@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, FileDown, Check, Eye } from 'lucide-react';
+import { X, FileDown, Check, Eye, Sheet, Pencil, Download } from 'lucide-react';
 import { DayPlan } from '../lib/types';
 import {
   PDFTheme,
@@ -8,7 +8,9 @@ import {
   ACCENT_PRESETS,
   generatePDFContent,
   exportToPDF,
+  exportEditablePDF,
 } from '../utils/exportPDF';
+import { downloadCSV, openInGoogleSheets } from '../utils/exportSheets';
 
 type Props = {
   plan: DayPlan[];
@@ -126,6 +128,29 @@ export default function PDFExportModal({ plan, city, vibe, onClose, onToast }: P
     } finally {
       setExporting(false);
     }
+  }
+
+  async function handleEditableExport() {
+    setExporting(true);
+    try {
+      await exportEditablePDF(plan, city, vibe, opts);
+      onToast?.('Editable itinerary opened — click any text to edit, then save as PDF', 'info');
+      onClose();
+    } catch (e: any) {
+      onToast?.(e.message, 'error');
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function handleDownloadCSV() {
+    downloadCSV(plan, city, vibe, false);
+    onToast?.('CSV downloaded — open it in Google Sheets or Excel', 'info');
+  }
+
+  function handleOpenGoogleSheets() {
+    openInGoogleSheets(plan, city, vibe);
+    onToast?.('Itinerary copied to clipboard — paste it into the new Google Sheet (Ctrl+V)', 'info');
   }
 
   return (
@@ -247,20 +272,52 @@ export default function PDFExportModal({ plan, city, vibe, onClose, onToast }: P
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t bg-slate-50">
-          <p className="text-xs text-slate-400">In the print dialog choose <strong>"Save as PDF"</strong> as the printer destination.</p>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 rounded-lg border text-sm hover:bg-slate-100">
-              Cancel
+        <div className="px-6 py-4 border-t bg-slate-50 space-y-3">
+          {/* Google Sheets / CSV row */}
+          <div className="flex items-center gap-2 pb-3 border-b border-slate-200">
+            <Sheet className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span className="text-xs text-slate-600 font-medium">Spreadsheet:</span>
+            <button
+              onClick={handleDownloadCSV}
+              className="px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50 text-xs font-medium flex items-center gap-1.5"
+            >
+              <Download className="w-3 h-3" />
+              Download CSV
             </button>
             <button
-              onClick={handleExport}
-              disabled={exporting}
-              className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium flex items-center gap-2 disabled:opacity-60"
+              onClick={handleOpenGoogleSheets}
+              className="px-3 py-1.5 rounded-lg border bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium flex items-center gap-1.5"
             >
-              <FileDown className="w-4 h-4" />
-              {exporting ? 'Opening…' : 'Print / Save as PDF'}
+              <Sheet className="w-3 h-3" />
+              Open in Google Sheets
             </button>
+            <span className="text-[10px] text-slate-400 ml-1">Editable in Sheets / Excel</span>
+          </div>
+
+          {/* PDF export row */}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-slate-400">Choose <strong>"Save as PDF"</strong> in print dialog, or use editable mode to customize first.</p>
+            <div className="flex gap-2">
+              <button onClick={onClose} className="px-4 py-2 rounded-lg border text-sm hover:bg-slate-100">
+                Cancel
+              </button>
+              <button
+                onClick={handleEditableExport}
+                disabled={exporting}
+                className="px-4 py-2 rounded-lg border-2 border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-medium flex items-center gap-2 disabled:opacity-60"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                Editable PDF
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium flex items-center gap-2 disabled:opacity-60"
+              >
+                <FileDown className="w-4 h-4" />
+                {exporting ? 'Opening…' : 'Print / Save as PDF'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
