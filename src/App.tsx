@@ -151,11 +151,11 @@ export default function App() {
   const showToast = (message: string, type: ToastData['type'] = 'success') =>
     setToast({ message, type });
   
-  // Swipe gestures for mobile
+  // Swipe gestures for mobile (touch only — trackMouse causes accidental day switches)
   const swipeHandlers = useSwipeable({
     onSwipedLeft: () => setCurrentDay(Math.min(daysCount, currentDay + 1)),
     onSwipedRight: () => setCurrentDay(Math.max(1, currentDay - 1)),
-    trackMouse: true
+    trackMouse: false
   });
 
   // keep days array in sync
