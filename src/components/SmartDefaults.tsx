@@ -121,28 +121,6 @@ export default function SmartDefaults({ onCitySelect, onVibeSelect, onQuickFill 
         </div>
       </div>
 
-      {/* Vibe presets */}
-      <div>
-        <div className="text-sm font-medium text-slate-600 mb-2">Trip Vibe</div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {VIBES.map(v => {
-            const preset = VIBE_PRESETS[v];
-            const Icon = preset.icon as ElementType;
-            return (
-              <button
-                key={v}
-                onClick={() => onVibeSelect(v)}
-                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl border text-xs font-medium transition-colors ${COLOR_CLASSES[preset.color]}`}
-              >
-                <Icon className="w-4 h-4" />
-                <span className="capitalize">{v}</span>
-                <span className="text-[10px] opacity-70 font-normal">{preset.description}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Quick fill CTA */}
       <button
         onClick={() => onQuickFill()}
