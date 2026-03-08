@@ -715,6 +715,7 @@ useEffect(() => {
           lastResultCount={lastResultCount}
           budget={budget}
           setBudget={setBudget}
+          city={city}
         />
         
         {/* Quick Actions Toolbar */}
