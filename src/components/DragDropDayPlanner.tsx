@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Clock, X, Plus, Copy, Sparkles } from 'lucide-react';
+import { X, Plus, Copy, Sparkles, ArrowLeftRight } from 'lucide-react';
 import PlacePhoto from './PlacePhoto';
 import { DayPlan, SelectedItem } from '../lib/types';
 import PlaceDetails from './PlaceDetails';
@@ -155,7 +155,7 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
           return (
             <div
               key={slot.key}
-              className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors"
+              className="group flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors"
             >
               {/* Photo */}
               <div className="relative flex-shrink-0">
@@ -177,15 +177,18 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
                 {item.area && <div className="text-[10px] text-slate-400 truncate">{item.area}</div>}
               </div>
 
-              {/* Actions */}
-              <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 hover:opacity-100" style={{ opacity: undefined }}>
-                {isHotel && city && <AffiliateButton type="hotel" href={generateHotelsLink(city, item.name)} />}
-                {isActivity && city && <AffiliateButton type="activity" href={generateViatorLink(city, item.name)} />}
-                {isFood && city && <AffiliateButton type="activity" href={generateTripAdvisorLink(city, item.name)} label="TripAdvisor" />}
-                <RegenerateButton onRegenerate={() => handleRegenerate(slot.key)} />
+              {/* Actions — always visible */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  onClick={() => openSlot(slot.key)}
+                  className="p-1 text-slate-400 hover:text-indigo-600 transition-colors"
+                  title={`Change ${slot.label}`}
+                >
+                  <ArrowLeftRight className="w-3.5 h-3.5" />
+                </button>
                 <button
                   onClick={() => removeItem(slot.key)}
-                  className="p-1 text-slate-300 hover:text-red-500 transition-colors"
+                  className="p-1 text-slate-400 hover:text-red-500 transition-colors"
                   title={`Remove ${slot.label}`}
                 >
                   <X className="w-3.5 h-3.5" />
