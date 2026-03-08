@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Heart, Users, Mountain, Star,
   ChevronLeft, ChevronRight, MapPin, Settings2,
@@ -57,6 +57,19 @@ export default function TopBar({
   const [hotelResults, setHotelResults] = useState<SelectedItem[]>([]);
   const [hotelSearching, setHotelSearching] = useState(false);
   const [showHotelSearch, setShowHotelSearch] = useState(false);
+  const hotelDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close hotel dropdown on click outside
+  useEffect(() => {
+    if (!showHotelSearch) return;
+    function handleClick(e: MouseEvent) {
+      if (hotelDropdownRef.current && !hotelDropdownRef.current.contains(e.target as Node)) {
+        setShowHotelSearch(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showHotelSearch]);
 
   async function searchHotels(q: string) {
     if (!apiBase || q.trim().length < 3) return;
@@ -92,7 +105,7 @@ export default function TopBar({
         </div>
 
         {/* Hotel inline */}
-        <div className="hidden sm:flex items-center gap-1.5 ml-1 relative">
+        <div ref={hotelDropdownRef} className="hidden sm:flex items-center gap-1.5 ml-1 relative">
           {hotel ? (
             <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 text-xs">
               <Hotel className="w-3 h-3 text-amber-600" />
