@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Star, Clock, Phone, ExternalLink, MapPin, Award } from "lucide-react";
+import { Star, Clock, Phone, ExternalLink, MapPin, Award, ArrowLeft, Plus } from "lucide-react";
 import { ApiSuggestion } from "../lib/types";
 
 type Props = {
   place: ApiSuggestion;
   onClose: () => void;
+  onChoose?: (place: ApiSuggestion) => void;
   city?: string;
 };
 
@@ -34,7 +35,7 @@ type PlaceDetails = {
   };
 };
 
-export default function PlaceDetails({ place, onClose, city }: Props) {
+export default function PlaceDetails({ place, onClose, onChoose, city }: Props) {
   const [details, setDetails] = useState<PlaceDetails | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -95,21 +96,30 @@ export default function PlaceDetails({ place, onClose, city }: Props) {
   }, [place]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-[55] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-xl w-[min(600px,90vw)] max-h-[80vh] overflow-hidden">
         <div className="p-4 border-b">
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-xl font-semibold">{place.name}</h2>
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <MapPin className="w-4 h-4" />
-                {place.area}
+          <div className="flex items-center gap-3">
+            <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 flex-shrink-0" title="Back to results">
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg font-semibold truncate">{place.name}</h2>
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <MapPin className="w-3.5 h-3.5" />
+                <span className="truncate">{place.area}</span>
               </div>
             </div>
-            <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-              ×
-            </button>
+            {onChoose && (
+              <button
+                onClick={() => onChoose(place)}
+                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium flex-shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                Add to Day
+              </button>
+            )}
           </div>
         </div>
 

@@ -372,6 +372,7 @@ export default function SuggestionModal({
         <PlaceDetails
           place={selectedPlace}
           onClose={() => setSelectedPlace(null)}
+          onChoose={(p) => { onChoose(p); setSelectedPlace(null); }}
           city={city}
         />
       )}
