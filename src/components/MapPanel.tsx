@@ -1,24 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { SelectedItem, DirectionsSegment } from "../lib/types";
+import { Footprints, Car, Navigation, ExternalLink, Maximize2, Locate, Route, MapPin, Clock, ArrowRight } from "lucide-react";
 
-const STL_BOUNDS = {
-  minLat: 38.45,
-  maxLat: 38.8,
-  minLng: -90.75,
-  maxLng: -90.05,
-};
-
-function project(lat?: number, lng?: number) {
-  if (lat == null || lng == null) return { x: -999, y: -999, hidden: true };
-  const { minLat, maxLat, minLng, maxLng } = STL_BOUNDS;
-  const nx = (lng - minLng) / (maxLng - minLng);
-  const ny = 1 - (lat - minLat) / (maxLat - minLat);
-  return {
-    x: 6 + nx * 88,
-    y: 6 + ny * 88,
-    hidden: nx < 0 || nx > 1 || ny < 0 || ny > 1,
-  };
-}
+// ─── Geo helpers ────────────────────────────────────────────────────────────
 
 function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371;
@@ -29,14 +13,65 @@ function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: num
     Math.cos((a.lat * Math.PI) / 180) *
       Math.cos((b.lat * Math.PI) / 180) *
       Math.sin(dLng / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(sa), Math.sqrt(1 - sa));
-  return R * c;
+  return R * 2 * Math.atan2(Math.sqrt(sa), Math.sqrt(1 - sa));
 }
 
 function etaMins(mode: "walk" | "drive", km: number) {
-  const speedKmh = mode === "walk" ? 5 : 35;
-  return Math.round((km / speedKmh) * 60);
+  return Math.round((km / (mode === "walk" ? 5 : 35)) * 60);
 }
+
+function formatDist(km: number) {
+  return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`;
+}
+
+// ─── Slot colors & labels ───────────────────────────────────────────────────
+
+const SLOT_COLORS: Record<string, string> = {
+  hotel: "#f59e0b",
+  breakfast: "#f97316",
+  activity: "#3b82f6",
+  activity2: "#8b5cf6",
+  lunch: "#10b981",
+  coffee: "#6366f1",
+  dinner: "#e11d48",
+};
+
+const SLOT_LABELS: Record<string, string> = {
+  hotel: "Hotel",
+  breakfast: "Breakfast",
+  activity: "Morning",
+  activity2: "Afternoon",
+  lunch: "Lunch",
+  coffee: "Coffee",
+  dinner: "Dinner",
+};
+
+const SLOT_ORDER = ["hotel", "breakfast", "activity", "lunch", "activity2", "coffee", "dinner"];
+
+// ─── SVG fallback helpers ───────────────────────────────────────────────────
+
+function computeBounds(items: Array<{ lat?: number; lng?: number }>) {
+  const valid = items.filter(i => i.lat != null && i.lng != null);
+  if (valid.length === 0) return { minLat: 38.45, maxLat: 38.8, minLng: -90.75, maxLng: -90.05 };
+  const lats = valid.map(i => i.lat!);
+  const lngs = valid.map(i => i.lng!);
+  const pad = 0.01;
+  return {
+    minLat: Math.min(...lats) - pad,
+    maxLat: Math.max(...lats) + pad,
+    minLng: Math.min(...lngs) - pad,
+    maxLng: Math.max(...lngs) + pad,
+  };
+}
+
+function project(lat: number | undefined, lng: number | undefined, bounds: ReturnType<typeof computeBounds>) {
+  if (lat == null || lng == null) return { x: -999, y: -999, hidden: true };
+  const nx = (lng - bounds.minLng) / (bounds.maxLng - bounds.minLng);
+  const ny = 1 - (lat - bounds.minLat) / (bounds.maxLat - bounds.minLat);
+  return { x: 6 + nx * 88, y: 6 + ny * 88, hidden: nx < -0.1 || nx > 1.1 || ny < -0.1 || ny > 1.1 };
+}
+
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 type Props = {
   currentDay: number;
@@ -47,6 +82,8 @@ type Props = {
   dirErr: string | null;
   onItemClick?: (item: SelectedItem) => void;
 };
+
+// ─── Component ──────────────────────────────────────────────────────────────
 
 export default function MapPanel({
   currentDay,
@@ -59,315 +96,503 @@ export default function MapPanel({
 }: Props) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const polylinesRef = useRef<any[]>([]);
+  const infoWindowRef = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false);
   const [usedGoogle, setUsedGoogle] = useState(false);
   const [cityCoords, setCityCoords] = useState({ lat: 38.627, lng: -90.199 });
+  const [travelMode, setTravelMode] = useState<"walk" | "drive">("walk");
+  const [highlightedIdx, setHighlightedIdx] = useState<number | null>(null);
+  const [showFullRoute, setShowFullRoute] = useState(true);
 
-  // Try to load Google Maps JS if a key is provided.
+  // Build the ordered list of all places (hotel first, then day items)
+  const allPlaces = useMemo(() => {
+    const items: Array<SelectedItem & { slotKey: string }> = [];
+    if (hotel) items.push({ ...hotel, slotKey: "hotel" });
+
+    // Map chosenItems to slot keys based on their position
+    const slotKeys = ["breakfast", "activity", "lunch", "activity2", "coffee", "dinner"];
+    // chosenItems comes from SLOT_SEQUENCE filtering, so we need to figure out the slot
+    // Actually, we'll infer from the order chosenItems appear
+    const daySlots = SLOT_ORDER.filter(k => k !== "hotel");
+    let slotIdx = 0;
+    chosenItems.forEach(item => {
+      if (item.name === hotel?.name) return; // skip hotel duplicate
+      const key = daySlots[slotIdx] || "activity";
+      items.push({ ...item, slotKey: key });
+      slotIdx++;
+    });
+    return items;
+  }, [hotel, chosenItems]);
+
+  // Compute segments between consecutive places
+  const segments = useMemo(() => {
+    const segs: Array<{
+      from: SelectedItem & { slotKey: string };
+      to: SelectedItem & { slotKey: string };
+      km: number;
+      mins: number;
+    }> = [];
+    for (let i = 0; i < allPlaces.length - 1; i++) {
+      const a = allPlaces[i];
+      const b = allPlaces[i + 1];
+      if (!a.lat || !a.lng || !b.lat || !b.lng) continue;
+      const km = haversineKm({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng });
+      segs.push({ from: a, to: b, km, mins: etaMins(travelMode, km) });
+    }
+    return segs;
+  }, [allPlaces, travelMode]);
+
+  const totalDistance = segments.reduce((s, seg) => s + seg.km, 0);
+  const totalTime = segments.reduce((s, seg) => s + seg.mins, 0);
+
+  // ─── Google Maps initialization ─────────────────────────────────────────
+
   useEffect(() => {
     if (typeof window === "undefined") return;
-
     const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!key) return;
 
-    if (!key) {
-      console.warn("MapPanel: no VITE_GOOGLE_MAPS_API_KEY found – using SVG fallback.");
-      return;
-    }
+    if ((window as any).google?.maps?.Map) { setMapReady(true); return; }
 
-    // If Google Maps JS is already loaded, just mark as ready.
-    if ((window as any).google && (window as any).google.maps && (window as any).google.maps.Map) {
-      setMapReady(true);
-      return;
-    }
-
-    // Check if script is already being loaded
     const existing = document.querySelector('script[src*="maps.googleapis.com"]');
     if (existing) {
-      (window as any).initGoogleMaps = () => setMapReady(true);
-      const checkLoaded = () => {
-        if ((window as any).google && (window as any).google.maps && (window as any).google.maps.Map) {
-          setMapReady(true);
-        } else {
-          setTimeout(checkLoaded, 100);
-        }
+      const check = () => {
+        if ((window as any).google?.maps?.Map) setMapReady(true);
+        else setTimeout(check, 100);
       };
-      checkLoaded();
+      check();
       return;
     }
 
     (window as any).initGoogleMaps = () => setMapReady(true);
-    
     const script = document.createElement("script");
     script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&loading=async&callback=initGoogleMaps`;
     script.async = true;
     script.defer = true;
-    script.onerror = () => {
-      console.error('Failed to load Google Maps script');
-    };
     document.head.appendChild(script);
   }, []);
 
-  // Geocode city to get coordinates
+  // Geocode city
   useEffect(() => {
     if (!mapReady || !city) return;
-    
     const g = (window as any).google;
     if (!g?.maps?.Geocoder) return;
-    
-    const geocoder = new g.maps.Geocoder();
-    geocoder.geocode({ address: city }, (results: any, status: any) => {
-      if (status === 'OK' && results[0]) {
-        const location = results[0].geometry.location;
-        setCityCoords({ lat: location.lat(), lng: location.lng() });
+    new g.maps.Geocoder().geocode({ address: city }, (results: any, status: any) => {
+      if (status === "OK" && results[0]) {
+        const loc = results[0].geometry.location;
+        setCityCoords({ lat: loc.lat(), lng: loc.lng() });
       }
     });
   }, [mapReady, city]);
 
-  // Initialize map once
+  // Create map
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
-
     const g = (window as any).google;
     if (!g?.maps?.Map) return;
 
     const map = new g.maps.Map(mapRef.current, {
-      zoom: 12,
+      zoom: 13,
       center: cityCoords,
       mapTypeControl: true,
       streetViewControl: true,
       fullscreenControl: true,
       zoomControl: true,
-      mapTypeControlOptions: {
-        style: g.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-        position: g.maps.ControlPosition.TOP_CENTER,
-      },
-      fullscreenControlOptions: {
-        position: g.maps.ControlPosition.RIGHT_TOP,
-      },
+      styles: [
+        { featureType: "poi.business", stylers: [{ visibility: "off" }] },
+        { featureType: "transit", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+      ],
     });
-
-    // Add traffic layer
-    const trafficLayer = new g.maps.TrafficLayer();
-    trafficLayer.setMap(map);
 
     mapInstanceRef.current = map;
     setUsedGoogle(true);
   }, [mapReady]);
 
-  // Update map center and markers when data changes
+  // Update markers and route lines
   useEffect(() => {
     if (!mapInstanceRef.current) return;
-
     const map = mapInstanceRef.current;
     const g = (window as any).google;
+    if (!g) return;
 
-    // Clear existing markers
-    // (In a real app, you'd track markers to clear them)
-    
-    const center = hotel?.lat && hotel.lng
-      ? { lat: hotel.lat, lng: hotel.lng }
-      : chosenItems[0]?.lat && chosenItems[0]?.lng
-      ? { lat: chosenItems[0].lat!, lng: chosenItems[0].lng! }
-      : cityCoords;
+    // Clear old markers and polylines
+    markersRef.current.forEach(m => m.setMap(null));
+    markersRef.current = [];
+    polylinesRef.current.forEach(p => p.setMap(null));
+    polylinesRef.current = [];
+    if (infoWindowRef.current) infoWindowRef.current.close();
 
-    map.setCenter(center);
+    const bounds = new g.maps.LatLngBounds();
+    let hasBounds = false;
 
-    // Add markers for chosen places
-    chosenItems.forEach((p) => {
-      if (!p.lat || !p.lng) return;
-      new g.maps.Marker({
-        position: { lat: p.lat, lng: p.lng },
+    // Create info window (shared)
+    const infoWindow = new g.maps.InfoWindow();
+    infoWindowRef.current = infoWindow;
+
+    // Add markers for each place
+    allPlaces.forEach((place, idx) => {
+      if (!place.lat || !place.lng) return;
+      const pos = { lat: place.lat, lng: place.lng };
+      bounds.extend(pos);
+      hasBounds = true;
+
+      const color = SLOT_COLORS[place.slotKey] || "#4F46E5";
+      const isHotel = place.slotKey === "hotel";
+      const label = isHotel ? "H" : String(idx);
+
+      const marker = new g.maps.Marker({
+        position: pos,
         map,
-        title: p.name,
+        title: place.name,
+        label: { text: label, color: "#fff", fontSize: "11px", fontWeight: "700" },
+        icon: {
+          path: isHotel ? g.maps.SymbolPath.BACKWARD_CLOSED_ARROW : g.maps.SymbolPath.CIRCLE,
+          scale: isHotel ? 7 : 8,
+          fillColor: color,
+          fillOpacity: 1,
+          strokeColor: "#fff",
+          strokeWeight: 2,
+          labelOrigin: isHotel ? new g.maps.Point(0, -3) : new g.maps.Point(0, 0),
+        },
+        zIndex: isHotel ? 100 : 50 - idx,
       });
+
+      marker.addListener("click", () => {
+        const slotLabel = SLOT_LABELS[place.slotKey] || place.slotKey;
+        const seg = segments.find(s => s.to.name === place.name);
+        const distInfo = seg ? `<div style="font-size:11px;color:#666;margin-top:4px;">${formatDist(seg.km)} from ${seg.from.name} (~${seg.mins} min ${travelMode})</div>` : "";
+
+        infoWindow.setContent(`
+          <div style="min-width:180px;font-family:system-ui,sans-serif;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${color};font-weight:700;margin-bottom:2px;">${slotLabel}</div>
+            <div style="font-size:14px;font-weight:600;">${place.name}</div>
+            ${place.area ? `<div style="font-size:12px;color:#64748b;">${place.area}</div>` : ""}
+            ${place.desc ? `<div style="font-size:11px;color:#94a3b8;margin-top:4px;">${place.desc}</div>` : ""}
+            ${distInfo}
+            ${place.url ? `<a href="${place.url}" target="_blank" style="font-size:11px;color:#4F46E5;text-decoration:none;display:inline-block;margin-top:6px;">Open in Google Maps &rarr;</a>` : ""}
+          </div>
+        `);
+        infoWindow.open(map, marker);
+        onItemClick?.(place);
+      });
+
+      // Highlight effect
+      if (highlightedIdx === idx) {
+        marker.setAnimation(g.maps.Animation.BOUNCE);
+        setTimeout(() => marker.setAnimation(null), 1400);
+      }
+
+      markersRef.current.push(marker);
     });
 
-    // Special marker for hotel
-    if (hotel?.lat && hotel.lng) {
-      new g.maps.Marker({
-        position: { lat: hotel.lat, lng: hotel.lng },
-        map,
-        title: "Hotel/Center",
-        icon: {
-          path: g.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-          scale: 5,
-          fillColor: "#f59e0b",
-          fillOpacity: 0.9,
-          strokeWeight: 1,
-        },
-      });
-    }
-  }, [cityCoords, hotel?.lat, hotel?.lng, JSON.stringify(chosenItems.map(c => c.name))]);
+    // Draw route polylines between stops
+    if (showFullRoute && allPlaces.length >= 2) {
+      for (let i = 0; i < allPlaces.length - 1; i++) {
+        const a = allPlaces[i];
+        const b = allPlaces[i + 1];
+        if (!a.lat || !a.lng || !b.lat || !b.lng) continue;
 
-  // Fallback straight segments when no real directions are available.
-  const straightSegments = React.useMemo(() => {
-    const segs: {
-      a: SelectedItem;
-      b: SelectedItem;
-      km: number;
-      mode: "walk" | "drive";
-      mins: number;
-    }[] = [];
-    for (let i = 0; i < chosenItems.length - 1; i++) {
-      const A = chosenItems[i]!;
-      const B = chosenItems[i + 1]!;
-      if (!A.lat || !A.lng || !B.lat || !B.lng) continue;
-      const km = haversineKm(
-        { lat: A.lat, lng: A.lng },
-        { lat: B.lat, lng: B.lng }
-      );
-      const mode: "walk" | "drive" = km > 1.2 ? "drive" : "walk";
-      const mins = etaMins(mode, km);
-      segs.push({ a: A, b: B, km, mode, mins });
+        const seg = segments[i];
+        const isWalk = !seg || seg.km < 1.2;
+
+        const polyline = new g.maps.Polyline({
+          path: [{ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }],
+          geodesic: true,
+          strokeColor: isWalk ? "#16a34a" : "#2563eb",
+          strokeOpacity: 0.7,
+          strokeWeight: 3,
+          icons: isWalk ? [{
+            icon: { path: "M 0,-1 0,1", strokeOpacity: 1, scale: 3 },
+            offset: "0",
+            repeat: "12px",
+          }] : [],
+          map,
+        });
+        polylinesRef.current.push(polyline);
+
+        // Distance label at midpoint
+        if (seg) {
+          const midLat = (a.lat + b.lat) / 2;
+          const midLng = (a.lng + b.lng) / 2;
+          const labelMarker = new g.maps.Marker({
+            position: { lat: midLat, lng: midLng },
+            map,
+            icon: {
+              path: g.maps.SymbolPath.CIRCLE,
+              scale: 0,
+            },
+            label: {
+              text: `${seg.mins}min`,
+              color: isWalk ? "#16a34a" : "#2563eb",
+              fontSize: "10px",
+              fontWeight: "600",
+              className: "map-distance-label",
+            },
+          });
+          markersRef.current.push(labelMarker);
+        }
+      }
     }
-    return segs;
-  }, [JSON.stringify(chosenItems.map((c) => c.name))]);
+
+    // Fit bounds
+    if (hasBounds) {
+      map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+    } else {
+      map.setCenter(cityCoords);
+      map.setZoom(13);
+    }
+  }, [allPlaces, segments, travelMode, showFullRoute, highlightedIdx, cityCoords]);
+
+  // Open Google Maps directions link
+  const googleMapsDirectionsUrl = useMemo(() => {
+    const validPlaces = allPlaces.filter(p => p.lat && p.lng);
+    if (validPlaces.length < 2) return null;
+    const origin = `${validPlaces[0].lat},${validPlaces[0].lng}`;
+    const dest = `${validPlaces[validPlaces.length - 1].lat},${validPlaces[validPlaces.length - 1].lng}`;
+    const waypoints = validPlaces.slice(1, -1).map(p => `${p.lat},${p.lng}`).join("|");
+    const mode = travelMode === "walk" ? "walking" : "driving";
+    return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}${waypoints ? `&waypoints=${waypoints}` : ""}&travelmode=${mode}`;
+  }, [allPlaces, travelMode]);
+
+  // SVG bounds for fallback
+  const svgBounds = useMemo(() => {
+    const items = hotel ? [hotel, ...chosenItems] : chosenItems;
+    return computeBounds(items);
+  }, [hotel, chosenItems]);
 
   return (
-    <div className="bg-white/90 backdrop-blur rounded-2xl border p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-2">
-        <div className="font-semibold">Map - Day {currentDay}</div>
-        <div className="text-[11px] text-slate-400">
-          {usedGoogle ? "Google Maps" : "SVG fallback (no Google key set)"}
+    <div className="bg-white/90 backdrop-blur rounded-2xl border shadow-sm overflow-hidden">
+      {/* Map header with controls */}
+      <div className="flex items-center justify-between px-4 py-3 border-b">
+        <div className="flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-indigo-500" />
+          <span className="font-semibold text-sm">Day {currentDay} Map</span>
+          {allPlaces.length > 0 && (
+            <span className="text-xs text-slate-400">
+              {allPlaces.length} stop{allPlaces.length !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Walk/Drive toggle */}
+          <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
+            <button
+              onClick={() => setTravelMode("walk")}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all ${
+                travelMode === "walk" ? "bg-white shadow-sm text-emerald-700" : "text-slate-500 hover:text-slate-700"
+              }`}
+              title="Walking estimates"
+            >
+              <Footprints className="w-3 h-3" />
+              Walk
+            </button>
+            <button
+              onClick={() => setTravelMode("drive")}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all ${
+                travelMode === "drive" ? "bg-white shadow-sm text-blue-700" : "text-slate-500 hover:text-slate-700"
+              }`}
+              title="Driving estimates"
+            >
+              <Car className="w-3 h-3" />
+              Drive
+            </button>
+          </div>
+
+          {/* Route toggle */}
+          <button
+            onClick={() => setShowFullRoute(!showFullRoute)}
+            className={`p-1.5 rounded-lg text-xs transition-colors ${
+              showFullRoute ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"
+            }`}
+            title={showFullRoute ? "Hide route lines" : "Show route lines"}
+          >
+            <Route className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Google Maps link */}
+          {googleMapsDirectionsUrl && (
+            <a
+              href={googleMapsDirectionsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-500 hover:text-blue-700 transition-colors"
+              title="Open full directions in Google Maps"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+            </a>
+          )}
         </div>
       </div>
 
-      <div ref={mapRef} className="w-full h-[400px] rounded-xl border" style={{ display: usedGoogle ? 'block' : 'none' }} />
+      {/* Total route summary */}
+      {segments.length > 0 && (
+        <div className="flex items-center gap-4 px-4 py-2 bg-slate-50 border-b text-xs">
+          <div className="flex items-center gap-1.5 text-slate-600">
+            <Route className="w-3 h-3" />
+            <span className="font-medium">Total:</span>
+            <span>{formatDist(totalDistance)}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-slate-600">
+            <Clock className="w-3 h-3" />
+            <span>{totalTime} min {travelMode === "walk" ? "walking" : "driving"}</span>
+          </div>
+          {travelMode === "walk" && totalDistance > 5 && (
+            <span className="text-amber-600 font-medium">Consider driving for this route</span>
+          )}
+        </div>
+      )}
+
+      {/* Google Maps container */}
+      <div ref={mapRef} className="w-full h-[420px]" style={{ display: usedGoogle ? "block" : "none" }} />
+
+      {/* SVG Fallback */}
       {!usedGoogle && (
-        <svg
-          viewBox="0 0 100 100"
-          className="w-full aspect-square rounded-xl border bg-slate-50"
-        >
-          {/* grid */}
-          {[...Array(8)].map((_, i) => (
-            <line
-              key={`h-${i}`}
-              x1={6}
-              x2={94}
-              y1={6 + i * 11}
-              y2={6 + i * 11}
-              stroke="#e5e7eb"
-              strokeWidth={0.4}
-            />
-          ))}
-          {[...Array(8)].map((_, i) => (
-            <line
-              key={`v-${i}`}
-              y1={6}
-              y2={94}
-              x1={6 + i * 11}
-              x2={6 + i * 11}
-              stroke="#e5e7eb"
-              strokeWidth={0.4}
-            />
+        <svg viewBox="0 0 100 100" className="w-full aspect-square bg-slate-50">
+          {/* Grid */}
+          {[...Array(10)].map((_, i) => (
+            <React.Fragment key={i}>
+              <line x1={6} x2={94} y1={6 + i * 8.8} y2={6 + i * 8.8} stroke="#e5e7eb" strokeWidth={0.3} />
+              <line y1={6} y2={94} x1={6 + i * 8.8} x2={6 + i * 8.8} stroke="#e5e7eb" strokeWidth={0.3} />
+            </React.Fragment>
           ))}
 
-          {/* directions segments (if any) */}
-          {dirSegs &&
-            dirSegs.map((seg, idx) => {
-              const pts = seg.path.map(([lat, lng]) => project(lat, lng));
-              const vis = pts.filter((p) => !p.hidden);
-              if (!vis.length) return null;
-              const d =
-                "M " +
-                vis
-                  .map((p, i) => `${i === 0 ? "" : "L "}${p.x} ${p.y}`)
-                  .join(" ");
-              return (
-                <g key={idx}>
-                  <path
-                    d={d}
-                    fill="none"
-                    stroke={seg.mode === "walk" ? "#16a34a" : "#2563eb"}
-                    strokeWidth={1.6}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </g>
-              );
-            })}
-
-          {/* fallback straight segments */}
-          {!dirSegs &&
-            straightSegments.map((seg, idx) => {
-              const a = project(seg.a.lat, seg.a.lng);
-              const b = project(seg.b.lat, seg.b.lng);
-              const color = seg.mode === "walk" ? "#16a34a" : "#2563eb";
-              return (
-                <g key={idx}>
-                  <line
-                    x1={a.x}
-                    y1={a.y}
-                    x2={b.x}
-                    y2={b.y}
-                    stroke={color}
-                    strokeWidth={1.2}
-                  />
-                </g>
-              );
-            })}
-
-          {/* pins */}
-          {chosenItems.map((p, idx) => {
-            const { x, y, hidden } = project(p.lat, p.lng);
-            if (hidden) return null;
-            const hue = 220 + idx * 40;
+          {/* Route lines */}
+          {showFullRoute && allPlaces.map((place, idx) => {
+            if (idx === 0) return null;
+            const prev = allPlaces[idx - 1];
+            if (!prev.lat || !prev.lng || !place.lat || !place.lng) return null;
+            const a = project(prev.lat, prev.lng, svgBounds);
+            const b = project(place.lat, place.lng, svgBounds);
+            if (a.hidden && b.hidden) return null;
+            const seg = segments[idx - 1];
+            const color = seg && seg.km > 1.2 ? "#2563eb" : "#16a34a";
             return (
-              <g key={`${p.name}-${idx}`}>
-                <circle cx={x} cy={y} r={2.8} fill={`hsl(${hue}, 80%, 45%)`} />
-                <text x={x + 3.8} y={y + 1.6} fontSize={3} fill="#334155">
-                  {p.name}
-                </text>
+              <g key={`line-${idx}`}>
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={1.2} strokeDasharray={seg && seg.km < 1.2 ? "2,2" : "none"} />
+                {seg && (
+                  <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 2} fontSize={2.5} fill={color} textAnchor="middle" fontWeight="600">
+                    {seg.mins}min
+                  </text>
+                )}
               </g>
             );
           })}
 
-          {/* hotel pin */}
-          {hotel && hotel.lat && hotel.lng && (() => {
-            const { x, y, hidden } = project(hotel.lat, hotel.lng);
+          {/* Pins */}
+          {allPlaces.map((place, idx) => {
+            const { x, y, hidden } = project(place.lat, place.lng, svgBounds);
             if (hidden) return null;
+            const color = SLOT_COLORS[place.slotKey] || "#4F46E5";
+            const isHighlighted = highlightedIdx === idx;
             return (
-              <g>
-                <rect x={x - 2} y={y - 2} width={4} height={4} fill="#f59e0b" />
-                <text x={x + 3.8} y={y + 1.6} fontSize={3} fill="#92400e">
-                  Hotel/Center
+              <g
+                key={`pin-${idx}`}
+                onClick={() => place && onItemClick?.(place)}
+                style={{ cursor: "pointer" }}
+              >
+                <circle cx={x} cy={y} r={isHighlighted ? 3.5 : 2.8} fill={color} stroke="#fff" strokeWidth={0.6} />
+                <text x={x} y={y + 1} fontSize={2.2} fill="#fff" textAnchor="middle" fontWeight="700">
+                  {place.slotKey === "hotel" ? "H" : idx}
+                </text>
+                <text x={x + 4} y={y + 1} fontSize={2.5} fill="#334155" fontWeight="500">
+                  {place.name}
                 </text>
               </g>
             );
-          })()}
+          })}
         </svg>
       )}
 
-      <div className="mt-2 text-xs text-slate-600">
-        {chosenItems.length === 0 && !hotel ? (
-          <div>No places selected yet.</div>
+      {/* Interactive place list */}
+      <div className="border-t">
+        {allPlaces.length === 0 && !hotel ? (
+          <div className="px-4 py-6 text-center text-sm text-slate-400">
+            <MapPin className="w-5 h-5 mx-auto mb-2 opacity-40" />
+            No places selected yet. Add stops to see them on the map.
+          </div>
         ) : (
-          <ul className="list-disc pl-5">
-            {(() => {
-              const seen = new Set<string>();
-              const allItems = hotel ? [hotel, ...chosenItems] : chosenItems;
-              
-              return allItems.map((p, i) => {
-                if (!p || !p.name || seen.has(p.name)) return null;
-                seen.add(p.name);
-                return (
-                  <li 
-                    key={i}
-                    onClick={() => onItemClick?.(p)}
-                    className="cursor-pointer hover:text-indigo-600 hover:underline"
+          <div className="divide-y divide-slate-100">
+            {allPlaces.map((place, idx) => {
+              const seg = idx > 0 ? segments[idx - 1] : null;
+              const color = SLOT_COLORS[place.slotKey] || "#4F46E5";
+              const slotLabel = SLOT_LABELS[place.slotKey] || place.slotKey;
+
+              return (
+                <React.Fragment key={`${place.name}-${idx}`}>
+                  {/* Distance segment between stops */}
+                  {seg && (
+                    <div className="flex items-center gap-2 px-4 py-1 bg-slate-50 text-[10px] text-slate-400">
+                      <div className="flex-1 border-t border-dashed border-slate-200" />
+                      <div className="flex items-center gap-1">
+                        {seg.km < 1.2 ? <Footprints className="w-2.5 h-2.5" /> : <Car className="w-2.5 h-2.5" />}
+                        <span>{formatDist(seg.km)}</span>
+                        <span>~{seg.mins} min</span>
+                      </div>
+                      <div className="flex-1 border-t border-dashed border-slate-200" />
+                    </div>
+                  )}
+
+                  {/* Place row */}
+                  <div
+                    className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
+                      highlightedIdx === idx ? "bg-indigo-50" : "hover:bg-slate-50"
+                    }`}
+                    onClick={() => onItemClick?.(place)}
+                    onMouseEnter={() => setHighlightedIdx(idx)}
+                    onMouseLeave={() => setHighlightedIdx(null)}
                   >
-                    {p.name}{" "}
-                    {p.area ? <span className="text-slate-500">· {p.area}</span> : null}
-                  </li>
-                );
-              }).filter(Boolean);
-            })()}
-          </ul>
+                    {/* Numbered badge */}
+                    <div
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                      style={{ backgroundColor: color }}
+                    >
+                      {place.slotKey === "hotel" ? "H" : idx}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] font-medium uppercase tracking-wider" style={{ color }}>
+                        {slotLabel}
+                      </div>
+                      <div className="text-sm font-medium text-slate-800 truncate">{place.name}</div>
+                      {place.area && (
+                        <div className="text-xs text-slate-500 truncate">{place.area}</div>
+                      )}
+                    </div>
+
+                    {/* External link */}
+                    {place.url && (
+                      <a
+                        href={place.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1 text-slate-400 hover:text-blue-600 flex-shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Open in Google Maps"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                  </div>
+                </React.Fragment>
+              );
+            })}
+          </div>
         )}
       </div>
+
+      {/* Map footer info */}
       {dirErr && (
-        <div className="mt-2 text-xs text-amber-700">
-          Directions error: {dirErr}. Falling back to straight-line estimates.
+        <div className="px-4 py-2 text-xs text-amber-700 bg-amber-50 border-t">
+          Directions unavailable: falling back to straight-line estimates.
+        </div>
+      )}
+
+      {!usedGoogle && (
+        <div className="px-4 py-2 text-[10px] text-slate-400 bg-slate-50 border-t text-center">
+          SVG fallback — set VITE_GOOGLE_MAPS_API_KEY for interactive Google Maps
         </div>
       )}
     </div>
