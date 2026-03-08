@@ -99,8 +99,17 @@ export default function App() {
   const plan = planHistory.currentState;
   const setPlan = planHistory.pushState;
   
-  // hotel / center
-  const [hotel, setHotel] = useState<SelectedItem | null>(null);
+  // hotel / center — restore from localStorage on startup
+  const [hotel, setHotel] = useState<SelectedItem | null>(() => {
+    const saved = localStorage.getItem('saved-plan');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        if (data.hotel) return data.hotel;
+      } catch {}
+    }
+    return null;
+  });
   
   // UI state
   const [showSmartDefaults, setShowSmartDefaults] = useState(!city || city === "");
@@ -175,6 +184,14 @@ export default function App() {
   const chosenItems = SLOT_SEQUENCE.map((k) => currentDayData[k]).filter(
     Boolean
   ) as SelectedItem[];
+
+  // Sync global hotel from current day's plan when switching days
+  useEffect(() => {
+    const dayHotel = currentDayData.hotel;
+    if (dayHotel?.lat && dayHotel?.lng) {
+      setHotel(dayHotel);
+    }
+  }, [currentDay]);
 
 
   // directions fetch
@@ -448,31 +465,41 @@ useEffect(() => {
     if (!city) { showToast('Pick a city first', 'error'); return; }
 
     setLoadingProgress(10);
-    const slots = ['hotel', 'breakfast', 'activity', 'activity2', 'lunch', 'coffee', 'dinner'];
+
+    // If the user already has a hotel (global or current day), keep it
+    const existingHotel = currentDayData.hotel || hotel;
+    const slotsToFetch = existingHotel
+      ? ['breakfast', 'activity', 'activity2', 'lunch', 'coffee', 'dinner']
+      : ['hotel', 'breakfast', 'activity', 'activity2', 'lunch', 'coffee', 'dinner'];
 
     try {
       // Fetch more options to avoid duplicates
-      const promises = slots.map(slot => {
+      const promises = slotsToFetch.map(slot => {
         const params = new URLSearchParams({
           city, vibe, slot, limit: "5", budget
         });
         return fetchAllPlaces(API_BASE, params, 1).then(result => ({ slot, items: result.items }));
       });
-      
+
       const results = await Promise.all(promises);
-      
+
       const newPlan = [...plan];
       const usedNames = new Set<string>();
-      
+
+      // Preserve existing hotel
+      if (existingHotel) {
+        (newPlan[currentDay - 1] as any).hotel = existingHotel;
+      }
+
       results.forEach(({ slot, items }) => {
         // Allow activities to be duplicated, but avoid duplicates within meals
         const isMealSlot = ['breakfast', 'lunch', 'coffee', 'dinner'].includes(slot);
-        
+
         // Find first item that hasn't been used (only check for meal slots)
-        const availableItem = isMealSlot 
+        const availableItem = isMealSlot
           ? items.find(item => !usedNames.has(item.name))
           : items[0]; // For activities, just take first item
-          
+
         if (availableItem) {
           // Only add to usedNames if it's a meal slot
           if (isMealSlot) {
@@ -488,7 +515,15 @@ useEffect(() => {
           };
         }
       });
-      
+
+      // Sync global hotel from newly fetched hotel if we didn't have one
+      if (!existingHotel) {
+        const fetchedHotel = (newPlan[currentDay - 1] as any).hotel;
+        if (fetchedHotel?.lat && fetchedHotel?.lng) {
+          setHotel(fetchedHotel);
+        }
+      }
+
       setPlan(newPlan);
       setLoadingProgress(100);
       showToast('Day auto-filled!');
@@ -604,10 +639,23 @@ useEffect(() => {
         <HotelSection
           city={city}
           hotel={hotel}
-          setHotel={setHotel}
+          setHotel={(h) => {
+            setHotel(h);
+            // Also update current day's hotel slot
+            if (h) {
+              const next = plan.map((d) => ({ ...d }));
+              next[currentDay - 1].hotel = h;
+              setPlan(next);
+            }
+          }}
           setCity={setCity}
           apiBase={API_BASE}
           onSampleItinerary={() => setShowSampleItinerary(true)}
+          onUseForAllDays={(h) => {
+            const next = plan.map((d) => ({ ...d, hotel: h }));
+            setPlan(next);
+            showToast(`"${h.name}" set as hotel for all ${daysCount} days`);
+          }}
         />
         
         {/* Route Optimization Panel */}
@@ -784,6 +832,9 @@ useEffect(() => {
             onClose={() => setShowSampleItinerary(false)}
             onApplyPlan={(newPlan) => {
               setPlan(newPlan);
+              // Sync global hotel from day 1's hotel (or first day that has one)
+              const firstHotel = newPlan.find(d => d.hotel?.lat && d.hotel?.lng)?.hotel;
+              if (firstHotel) setHotel(firstHotel);
               setShowSampleItinerary(false);
               showToast('Sample itinerary applied!');
             }}
