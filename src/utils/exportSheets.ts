@@ -100,7 +100,7 @@ export function downloadCSV(plan: DayPlan[], city: string, vibe: string, detaile
  * Creates a Google Sheets import via a data URI workaround
  */
 export function openInGoogleSheets(plan: DayPlan[], city: string, vibe: string): void {
-  const csv = generateCSV(plan, city, vibe);
+  const csv = generateDetailedCSV(plan, city, vibe);
 
   // Google Sheets can import from a pasted CSV. We'll copy to clipboard and open Sheets.
   // The most reliable no-auth approach is to download CSV and let user import,

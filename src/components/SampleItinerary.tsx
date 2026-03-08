@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Calendar, Download, Share2, X, MapPin, Clock } from 'lucide-react';
+import { Calendar, Download, Share2, X, MapPin, Clock, FileDown, Sheet } from 'lucide-react';
 import { DayPlan, Vibe, ApiSuggestion } from '../lib/types';
 import { fetchAllPlaces, detectApiBase, fetchDayNotes } from '../lib/api';
+import { downloadCSV, openInGoogleSheets } from '../utils/exportSheets';
 
 type Props = {
   city: string;
@@ -209,30 +210,61 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
     onApplyPlan(plan);
   };
 
-  const exportToCSV = () => {
-    const headers = ['Day', 'Hotel', 'Breakfast', 'Morning Activity', 'Lunch', 'Afternoon Activity', 'Coffee', 'Dinner', 'Notes'];
-    const csvContent = [
-      headers.join(','),
-      ...samplePlan.map(day => [
-        day.day,
-        `"${day.hotel?.name || 'TBD'}"`,
-        `"${day.breakfast?.name || 'TBD'}"`,
-        `"${day.activity?.name || 'TBD'}"`,
-        `"${day.lunch?.name || 'TBD'}"`,
-        `"${day.activity2?.name || 'TBD'}"`,
-        `"${day.coffee?.name || 'TBD'}"`,
-        `"${day.dinner?.name || 'TBD'}"`,
-        `"${day.notes}"`
-      ].join(','))
-    ].join('\n');
+  const sampleAsDayPlan = (): DayPlan[] => samplePlan.map(day => {
+    const convert = (s?: ApiSuggestion) => s ? {
+      name: s.name, url: s.url, area: s.area, lat: s.lat, lng: s.lng,
+      desc: s.desc, placeId: s.placeId, cuisine: s.cuisine, price: s.price,
+    } : undefined;
+    return {
+      hotel: convert(day.hotel), breakfast: convert(day.breakfast),
+      activity: convert(day.activity), lunch: convert(day.lunch),
+      activity2: convert(day.activity2), coffee: convert(day.coffee),
+      dinner: convert(day.dinner), notes: day.notes,
+    };
+  });
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${city}-${vibe}-itinerary.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+  const handleDownloadCSV = () => {
+    downloadCSV(sampleAsDayPlan(), city, vibe, false);
+    onToast?.('CSV downloaded');
+  };
+
+  const handleGoogleSheets = () => {
+    openInGoogleSheets(sampleAsDayPlan(), city, vibe);
+    onToast?.('CSV copied to clipboard — paste into the new Google Sheet (Ctrl+V)');
+  };
+
+  const handleExportPDF = () => {
+    // Print the sample itinerary content as PDF
+    const content = samplePlan.map(day =>
+      `Day ${day.day}\nHotel: ${day.hotel?.name || 'TBD'}\nBreakfast: ${day.breakfast?.name || 'TBD'}\nMorning: ${day.activity?.name || 'TBD'}\nLunch: ${day.lunch?.name || 'TBD'}\nAfternoon: ${day.activity2?.name || 'TBD'}\nCoffee: ${day.coffee?.name || 'TBD'}\nDinner: ${day.dinner?.name || 'TBD'}\nNotes: ${day.notes}\n`
+    ).join('\n');
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`<html><head><title>${city} Itinerary</title>
+        <style>body{font-family:system-ui,sans-serif;padding:2rem;max-width:800px;margin:0 auto}
+        h1{font-size:1.5rem;margin-bottom:1rem}
+        .day{border:1px solid #e2e8f0;border-radius:8px;padding:1rem;margin-bottom:1rem;page-break-inside:avoid}
+        .day h2{font-size:1.1rem;margin:0 0 .5rem}
+        .slot{display:flex;gap:.5rem;padding:.25rem 0;font-size:.9rem}
+        .label{font-weight:600;min-width:120px}
+        .notes{font-style:italic;color:#64748b;margin-top:.5rem;font-size:.85rem}</style></head><body>
+        <h1>${vibe.charAt(0).toUpperCase() + vibe.slice(1)} Trip to ${city}</h1>`);
+      samplePlan.forEach(day => {
+        printWindow.document.write(`<div class="day"><h2>Day ${day.day}</h2>
+          <div class="slot"><span class="label">Hotel:</span>${day.hotel?.name || 'TBD'}</div>
+          <div class="slot"><span class="label">Breakfast:</span>${day.breakfast?.name || 'TBD'}</div>
+          <div class="slot"><span class="label">Morning:</span>${day.activity?.name || 'TBD'}</div>
+          <div class="slot"><span class="label">Lunch:</span>${day.lunch?.name || 'TBD'}</div>
+          <div class="slot"><span class="label">Afternoon:</span>${day.activity2?.name || 'TBD'}</div>
+          <div class="slot"><span class="label">Coffee:</span>${day.coffee?.name || 'TBD'}</div>
+          <div class="slot"><span class="label">Dinner:</span>${day.dinner?.name || 'TBD'}</div>
+          <div class="notes">${day.notes}</div></div>`);
+      });
+      printWindow.document.write('</body></html>');
+      printWindow.document.close();
+      printWindow.print();
+    }
   };
 
   const shareItinerary = async () => {
@@ -310,36 +342,55 @@ export default function SampleItinerary({ city, vibe, daysCount, onClose, onAppl
           </div>
         </div>
 
-        <div className="p-4 border-t bg-slate-50 flex gap-3">
-          <button
-            onClick={applyToPlanner}
-            disabled={loading || samplePlan.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-          >
-            Apply to Planner
-          </button>
-          <button
-            onClick={exportToCSV}
-            disabled={loading || samplePlan.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-          >
-            <Download className="w-4 h-4" />
-            Export CSV
-          </button>
-          <button
-            onClick={shareItinerary}
-            disabled={loading || samplePlan.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            <Share2 className="w-4 h-4" />
-            Share
-          </button>
-          <button
-            onClick={onClose}
-            className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-slate-100"
-          >
-            Close
-          </button>
+        <div className="p-4 border-t bg-slate-50">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={applyToPlanner}
+              disabled={loading || samplePlan.length === 0}
+              className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
+            >
+              Apply to Planner
+            </button>
+            <button
+              onClick={handleExportPDF}
+              disabled={loading || samplePlan.length === 0}
+              className="flex items-center gap-1.5 px-3 py-2 border rounded-lg hover:bg-slate-100 disabled:opacity-50 text-sm"
+            >
+              <FileDown className="w-4 h-4" />
+              PDF
+            </button>
+            <button
+              onClick={handleDownloadCSV}
+              disabled={loading || samplePlan.length === 0}
+              className="flex items-center gap-1.5 px-3 py-2 border rounded-lg hover:bg-slate-100 disabled:opacity-50 text-sm"
+            >
+              <Download className="w-4 h-4" />
+              CSV
+            </button>
+            <button
+              onClick={handleGoogleSheets}
+              disabled={loading || samplePlan.length === 0}
+              className="flex items-center gap-1.5 px-3 py-2 border rounded-lg hover:bg-slate-100 disabled:opacity-50 text-sm"
+            >
+              <Sheet className="w-4 h-4" />
+              Google Sheets
+            </button>
+            <button
+              onClick={shareItinerary}
+              disabled={loading || samplePlan.length === 0}
+              className="flex items-center gap-1.5 px-3 py-2 border rounded-lg hover:bg-slate-100 disabled:opacity-50 text-sm"
+            >
+              <Share2 className="w-4 h-4" />
+              Share
+            </button>
+            <div className="flex-1" />
+            <button
+              onClick={onClose}
+              className="px-3 py-2 text-sm text-slate-500 hover:text-slate-700"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

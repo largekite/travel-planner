@@ -77,7 +77,7 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
   };
 
   return (
-    <div className="rounded-2xl bg-white/90 backdrop-blur border shadow-sm">
+    <div className="rounded-2xl bg-white/90 backdrop-blur border shadow-sm overflow-visible">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b">
         <div className="flex items-center gap-2">
@@ -95,19 +95,22 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
                 <Copy className="w-3.5 h-3.5" />
               </button>
               {showCopyMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg py-1 z-20 min-w-[100px]">
-                  {Array.from({ length: daysCount }, (_, i) => i + 1)
-                    .filter(d => d !== currentDay)
-                    .map(d => (
-                      <button
-                        key={d}
-                        onClick={() => handleCopyToDay(d)}
-                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50"
-                      >
-                        Day {d}
-                      </button>
-                    ))}
-                </div>
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowCopyMenu(false)} />
+                  <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg py-1 z-40 min-w-[100px]">
+                    {Array.from({ length: daysCount }, (_, i) => i + 1)
+                      .filter(d => d !== currentDay)
+                      .map(d => (
+                        <button
+                          key={d}
+                          onClick={() => handleCopyToDay(d)}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50"
+                        >
+                          Day {d}
+                        </button>
+                      ))}
+                  </div>
+                </>
               )}
             </div>
           )}
