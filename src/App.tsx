@@ -24,7 +24,7 @@ import {
   fetchDirections,
   detectApiBase,
 } from "./lib/api";
-import { optimizeRoute, calculateRouteTotals } from "./lib/routeOptimizer";
+import RouteOptimizerPanel from "./components/RouteOptimizer";
 import PDFExportModal from "./components/PDFExportModal";
 import ErrorBoundary from "./components/ErrorBoundary";
 import PlaceDetails from "./components/PlaceDetails";
@@ -112,8 +112,7 @@ export default function App() {
   // Online status
   const isOnline = useOnline();
 
-  // route optimization
-  const [showOptimization, setShowOptimization] = useState(false);
+
 
   // modal
   const [slotModalOpen, setSlotModalOpen] = useState(false);
@@ -612,114 +611,29 @@ useEffect(() => {
         />
         
         {/* Route Optimization Panel */}
-        {chosenItems.length > 2 && (
-          <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <div className="font-semibold">Rearrange Your Itinerary</div>
-                <div className="text-xs text-slate-500">Minimize walking between activities</div>
-              </div>
-              <button
-                onClick={() => setShowOptimization(!showOptimization)}
-                className="px-3 py-1.5 rounded-lg border bg-white text-sm"
-              >
-                {showOptimization ? 'Hide' : 'See Suggestions'}
-              </button>
-            </div>
-            
-            {showOptimization && (() => {
-              // Exclude the hotel from optimization input and dedupe by name
-              const itemsToOptimize = chosenItems.filter(ci => ci.name !== hotel?.name);
-              const uniqueItems: SelectedItem[] = [];
-              const seen = new Set<string>();
-              for (const it of itemsToOptimize) {
-                if (!it || !it.name) continue;
-                if (seen.has(it.name)) continue;
-                seen.add(it.name);
-                uniqueItems.push(it);
+        <RouteOptimizerPanel
+          chosenItems={chosenItems}
+          hotel={hotel}
+          onApply={(optimizedOrder) => {
+            const dayData = { ...currentDayData };
+            const slots = ['breakfast', 'activity', 'lunch', 'activity2', 'coffee', 'dinner'] as const;
+
+            // Clear current non-hotel slots
+            slots.forEach(slot => delete dayData[slot]);
+
+            // Apply optimized order
+            optimizedOrder.forEach((item, i) => {
+              if (slots[i]) {
+                dayData[slots[i]] = item;
               }
+            });
 
-              const optimization = optimizeRoute(
-                uniqueItems,
-                hotel ? { lat: hotel.lat!, lng: hotel.lng! } : undefined,
-                "walk"
-              );
-              // Compute original route totals for a fair comparison
-              const originalTotals = calculateRouteTotals(
-                uniqueItems,
-                hotel ? { lat: hotel.lat!, lng: hotel.lng! } : undefined,
-                "walk"
-              );
-              const savedMinutes = Math.max(0, Math.round(originalTotals.totalTime - optimization.totalTime));
-
-              return (
-                <div className="space-y-3">
-                  <div className="text-sm bg-green-50 border border-green-200 rounded p-3 text-green-800">
-                    💡 Rearranging in this order saves ~{savedMinutes} minutes of walking — {originalTotals.totalTime}min → {optimization.totalTime}min
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <div className="font-medium mb-2 text-slate-700">Your Current Order:</div>
-                      <div className="space-y-1">
-                        {uniqueItems.map((item, i) => (
-                          <div key={i} className="text-slate-600 text-xs">
-                            {i + 1}. {item.name}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <div className="font-medium mb-2 text-slate-700">Suggested Order:</div>
-                      <div className="space-y-1">
-                        {optimization.optimizedOrder.map((item, i) => (
-                          <div key={i} className="text-slate-600 text-xs">
-                            {i + 1}. {item.name}
-                          </div>
-                        ))}
-                      </div>
-                      <div className="mt-2 text-xs text-slate-500">
-                        Walking: {optimization.totalTime}min, {optimization.totalDistance}km
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-3 text-xs text-slate-600 bg-blue-50 border border-blue-200 rounded p-2">
-                    <strong>What this does:</strong> Rearranges your day's activities to minimize walking. Your hotel stays the same.
-                  </div>
-                  
-                  <button
-                    onClick={() => {
-                      // Apply optimization to current day
-                      const dayData = { ...currentDayData };
-                      const slots = ['breakfast', 'activity', 'lunch', 'coffee', 'dinner'] as const;
-                      
-                      // Clear current slots
-                      slots.forEach(slot => delete dayData[slot]);
-                      
-                      // Apply optimized order
-                      optimization.optimizedOrder.forEach((item, i) => {
-                        if (slots[i]) {
-                          dayData[slots[i]] = item;
-                        }
-                      });
-                      
-                      const next = [...plan];
-                      next[currentDay - 1] = dayData;
-                      setPlan(next);
-                      setShowOptimization(false);
-                      showToast('Route applied! Press Ctrl+Z to undo.', 'info');
-                    }}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
-                  >
-                    Apply Suggested Order
-                  </button>
-                </div>
-              );
-            })()}
-          </div>
-        )}
+            const next = [...plan];
+            next[currentDay - 1] = dayData;
+            setPlan(next);
+          }}
+          onToast={(msg) => showToast(msg, 'info')}
+        />
 
         <div className="grid lg:grid-cols-2 gap-5">
           <div className={`space-y-4 ${mobileView === 'map' ? 'hidden lg:block' : ''}`}>

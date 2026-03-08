@@ -77,9 +77,17 @@ export type DirectionsSegment = {
   to: string;
 };
 
+export type RouteLeg = {
+  from: SelectedItem;
+  to: SelectedItem;
+  distance: number; // km
+  time: number; // minutes
+};
+
 export type RouteOptimization = {
   originalOrder: SelectedItem[];
   optimizedOrder: SelectedItem[];
   totalTime: number;
   totalDistance: number;
+  legs?: RouteLeg[];
 };
