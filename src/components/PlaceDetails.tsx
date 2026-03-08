@@ -1,10 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { Star, Clock, Phone, ExternalLink, MapPin } from "lucide-react";
+import { Star, Clock, Phone, ExternalLink, MapPin, Award } from "lucide-react";
 import { ApiSuggestion } from "../lib/types";
 
 type Props = {
   place: ApiSuggestion;
   onClose: () => void;
+  city?: string;
+};
+
+type YelpReview = {
+  author: string;
+  rating: number;
+  text: string;
+  isElite: boolean;
+  timeCreated?: string;
 };
 
 type PlaceDetails = {
@@ -17,9 +26,15 @@ type PlaceDetails = {
   hours?: string[];
   phone?: string;
   website?: string;
+  yelp?: {
+    rating?: number;
+    reviewCount?: number;
+    url?: string;
+    reviews: YelpReview[];
+  };
 };
 
-export default function PlaceDetails({ place, onClose }: Props) {
+export default function PlaceDetails({ place, onClose, city }: Props) {
   const [details, setDetails] = useState<PlaceDetails | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,7 +57,12 @@ export default function PlaceDetails({ place, onClose }: Props) {
 
     async function fetchPlaceDetails() {
       try {
-        const response = await fetch(`/api/place-details?placeId=${place.placeId}`);
+        const params = new URLSearchParams({ placeId: place.placeId! });
+        if (place.name) params.set("name", place.name);
+        if (place.lat) params.set("lat", String(place.lat));
+        if (place.lng) params.set("lng", String(place.lng));
+        if (city) params.set("city", city);
+        const response = await fetch(`/api/place-details?${params}`);
         if (response.ok) {
           const data = await response.json();
           setDetails(data);
@@ -149,10 +169,13 @@ export default function PlaceDetails({ place, onClose }: Props) {
                 </div>
               )}
 
-              {/* Reviews */}
-              {details?.reviews && (
+              {/* Google Reviews */}
+              {details?.reviews && details.reviews.length > 0 && (
                 <div>
-                  <h3 className="font-medium mb-2">Recent Reviews</h3>
+                  <h3 className="font-medium mb-2 flex items-center gap-2">
+                    <Star className="w-4 h-4 text-yellow-500" />
+                    Google Reviews
+                  </h3>
                   <div className="space-y-3">
                     {details.reviews.map((review, i) => (
                       <div key={i} className="border-l-2 border-slate-200 pl-3">
@@ -161,6 +184,55 @@ export default function PlaceDetails({ place, onClose }: Props) {
                           <div className="flex">
                             {Array.from({ length: 5 }, (_, j) => (
                               <Star key={j} className={`w-3 h-3 ${j < review.rating ? 'text-yellow-500 fill-current' : 'text-slate-300'}`} />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-sm text-slate-600">{review.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Yelp — What Locals Recommend */}
+              {details?.yelp && details.yelp.reviews.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-medium flex items-center gap-2">
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-red-600 text-white text-[10px] font-bold">Y</span>
+                      What Locals Recommend
+                    </h3>
+                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                      {details.yelp.rating && (
+                        <span className="flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 text-red-500 fill-red-500" />
+                          {details.yelp.rating.toFixed(1)}
+                        </span>
+                      )}
+                      {details.yelp.reviewCount && (
+                        <span>({details.yelp.reviewCount.toLocaleString()} reviews)</span>
+                      )}
+                      {details.yelp.url && (
+                        <a href={details.yelp.url} target="_blank" rel="noopener noreferrer" className="text-red-600 hover:text-red-700">
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {details.yelp.reviews.map((review, i) => (
+                      <div key={i} className={`border-l-2 pl-3 ${review.isElite ? 'border-red-400 bg-red-50/50 rounded-r-lg py-2 pr-2' : 'border-slate-200'}`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm">{review.author}</span>
+                          {review.isElite && (
+                            <span className="inline-flex items-center gap-0.5 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                              <Award className="w-2.5 h-2.5" />
+                              Elite
+                            </span>
+                          )}
+                          <div className="flex">
+                            {Array.from({ length: 5 }, (_, j) => (
+                              <Star key={j} className={`w-3 h-3 ${j < review.rating ? 'text-red-500 fill-current' : 'text-slate-300'}`} />
                             ))}
                           </div>
                         </div>

@@ -51,6 +51,7 @@ type Props = {
   lastResultCount?: number;
   budget?: Budget;
   setBudget?: (b: Budget) => void;
+  city?: string;
 };
 
 type FilterState = {
@@ -81,6 +82,7 @@ export default function SuggestionModal({
   lastResultCount,
   budget = 'moderate',
   setBudget,
+  city,
 }: Props) {
   const [view, setView] = useState<"list" | "map">("list");
   const [selectedPlace, setSelectedPlace] = useState<ApiSuggestion | null>(null);
@@ -370,6 +372,7 @@ export default function SuggestionModal({
         <PlaceDetails
           place={selectedPlace}
           onClose={() => setSelectedPlace(null)}
+          city={city}
         />
       )}
       
