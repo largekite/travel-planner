@@ -36,6 +36,7 @@ import { useHistory } from "./hooks/useHistory";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useOnline } from "./hooks/useOnline";
 import SampleItinerary from "./components/SampleItinerary";
+import TripProgress, { calculateOverallCompletion } from "./components/TripProgress";
 
 // slots in the order they show up on the map
 const SLOT_SEQUENCE: (keyof DayPlan)[] = [
@@ -568,6 +569,9 @@ useEffect(() => {
           setDaysCount={setDaysCount}
           currentDay={currentDay}
           setCurrentDay={setCurrentDay}
+          budget={budget}
+          setBudget={setBudget}
+          completionPercent={city ? calculateOverallCompletion(plan) : undefined}
         />
 
         {/* Hero Image */}
@@ -728,6 +732,7 @@ useEffect(() => {
               loadingProgress={loadingProgress}
               city={city}
               vibe={vibe}
+              daysCount={daysCount}
             />
 
           </div>
@@ -751,6 +756,16 @@ useEffect(() => {
 
         {/* Mobile View Toggle */}
         <ViewToggle view={mobileView} onViewChange={setMobileView} />
+
+        {/* Trip Progress Tracker */}
+        {city && plan.length > 0 && (
+          <TripProgress
+            plan={plan}
+            currentDay={currentDay}
+            city={city}
+            onDayClick={setCurrentDay}
+          />
+        )}
 
         {/* Plan view */}
         <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm" data-print-section>
@@ -864,19 +879,66 @@ useEffect(() => {
         
         {/* Help Modal */}
         {showHelp && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-2xl p-6 max-w-md mx-4">
-              <h3 className="font-semibold mb-4">How to use Travel Planner</h3>
-              <div className="space-y-2 text-sm text-slate-600">
-                <p>• Click on time slots to add places</p>
-                <p>• Drag items to reorder your day</p>
-                <p>• Use filters to find specific types of places</p>
-                <p>• Compare places before choosing</p>
-                <p>• Auto-optimize your route for efficiency</p>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowHelp(false)}>
+            <div className="bg-white rounded-2xl p-6 max-w-lg mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <h3 className="font-semibold text-lg mb-4">How to use Travel Planner</h3>
+
+              {/* Getting started steps */}
+              <div className="mb-5">
+                <div className="text-sm font-medium text-slate-700 mb-2">Getting Started</div>
+                <div className="space-y-2">
+                  {[
+                    { step: '1', text: 'Pick a city from Quick Start or type one in' },
+                    { step: '2', text: 'Choose your trip vibe and budget level' },
+                    { step: '3', text: 'Set number of days for your trip' },
+                    { step: '4', text: 'Select a hotel/base to center your search' },
+                    { step: '5', text: 'Fill each time slot or use Auto-fill' },
+                    { step: '6', text: 'Optimize your route to save walking time' },
+                    { step: '7', text: 'Export as PDF, print, or share your plan' },
+                  ].map(({ step, text }) => (
+                    <div key={step} className="flex items-start gap-3 text-sm">
+                      <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{step}</span>
+                      <span className="text-slate-600">{text}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              {/* Features */}
+              <div className="mb-5">
+                <div className="text-sm font-medium text-slate-700 mb-2">Features</div>
+                <div className="space-y-1.5 text-sm text-slate-600">
+                  <p>- Click time slots to browse and add places</p>
+                  <p>- Use "Copy day" to duplicate a day's plan</p>
+                  <p>- Click the refresh icon to get a different suggestion</p>
+                  <p>- Use filters (area, distance, budget) to refine results</p>
+                  <p>- Compare places side-by-side before choosing</p>
+                  <p>- Route optimization rearranges stops to save walking</p>
+                  <p>- Swipe left/right on mobile to change days</p>
+                </div>
+              </div>
+
+              {/* Keyboard Shortcuts */}
+              <div className="mb-5">
+                <div className="text-sm font-medium text-slate-700 mb-2">Keyboard Shortcuts</div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {[
+                    { keys: 'Ctrl + Z', action: 'Undo' },
+                    { keys: 'Ctrl + Y', action: 'Redo' },
+                    { keys: 'Ctrl + S', action: 'Save' },
+                    { keys: 'Ctrl + P', action: 'Print' },
+                  ].map(({ keys, action }) => (
+                    <div key={keys} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
+                      <span className="text-slate-600">{action}</span>
+                      <kbd className="px-2 py-0.5 rounded bg-slate-200 text-xs font-mono text-slate-700">{keys}</kbd>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <button
                 onClick={() => setShowHelp(false)}
-                className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 w-full"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 w-full"
               >
                 Got it!
               </button>
