@@ -279,6 +279,92 @@ function base(css: string, body: string, city: string): string {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${city} Itinerary</title><style>${css}</style></head><body>${body}</body></html>`;
 }
 
+function editableBase(css: string, body: string, city: string): string {
+  const editableCSS = `
+    ${css}
+    /* Editable mode styles */
+    [contenteditable]:hover { outline: 2px dashed #94a3b8; outline-offset: 2px; border-radius: 4px; }
+    [contenteditable]:focus { outline: 2px solid #4F46E5; outline-offset: 2px; border-radius: 4px; background: #EEF2FF; }
+    .edit-toolbar { position: fixed; top: 0; left: 0; right: 0; background: #1e293b; color: white; padding: 10px 20px; display: flex; align-items: center; gap: 12px; z-index: 1000; font-family: system-ui, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+    .edit-toolbar button { background: #4F46E5; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .edit-toolbar button:hover { background: #4338CA; }
+    .edit-toolbar button.secondary { background: transparent; border: 1px solid #475569; }
+    .edit-toolbar button.secondary:hover { background: #334155; }
+    .edit-toolbar .spacer { flex: 1; }
+    .edit-toolbar .hint { font-size: 12px; color: #94a3b8; }
+    .edit-toolbar .add-row-btn { background: #059669; }
+    .edit-toolbar .add-row-btn:hover { background: #047857; }
+    body { padding-top: 60px; }
+    @media print { .edit-toolbar { display: none !important; } body { padding-top: 0; } [contenteditable]:hover, [contenteditable]:focus { outline: none; background: transparent; } }
+  `;
+  const editableScript = `
+    <script>
+      // Make all text content editable
+      document.querySelectorAll('.slot-name, .slot-area, .notes, .city, .subtitle, .day-title, .day-label, .slot-label, .meta, .day-header, .day-meta, .slot-body').forEach(el => {
+        el.setAttribute('contenteditable', 'true');
+        el.setAttribute('spellcheck', 'true');
+      });
+
+      // Add a new empty day
+      function addDay() {
+        const days = document.querySelectorAll('.day');
+        const lastDay = days[days.length - 1];
+        if (!lastDay) return;
+        const newDay = lastDay.cloneNode(true);
+        // Update day number
+        const dayNum = days.length + 1;
+        newDay.querySelectorAll('.slot-name, .slot-area').forEach(el => { el.textContent = 'Click to edit'; });
+        const header = newDay.querySelector('.day-header, .day-num, .stamp-num, .day-label');
+        if (header) {
+          if (header.classList.contains('day-num')) header.textContent = String(dayNum).padStart(2, '0');
+          else if (header.classList.contains('stamp-num')) header.textContent = String(dayNum);
+          else header.textContent = 'Day ' + dayNum;
+        }
+        const metaEl = newDay.querySelector('.day-meta, .day-title');
+        if (metaEl && metaEl.classList.contains('day-meta')) metaEl.textContent = 'Day ' + dayNum;
+        else if (metaEl) metaEl.textContent = 'Day ' + dayNum;
+        lastDay.parentNode.insertBefore(newDay, lastDay.nextSibling);
+      }
+
+      function printPDF() {
+        window.print();
+      }
+
+      function downloadHTML() {
+        // Remove toolbar for download
+        const toolbar = document.querySelector('.edit-toolbar');
+        if (toolbar) toolbar.style.display = 'none';
+        // Remove contenteditable
+        document.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+        const html = '<!DOCTYPE html>' + document.documentElement.outerHTML;
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = document.title.replace(/[^a-zA-Z0-9]/g, '_') + '.html';
+        a.click();
+        URL.revokeObjectURL(url);
+        // Restore
+        if (toolbar) toolbar.style.display = '';
+        document.querySelectorAll('.slot-name, .slot-area, .notes, .city, .subtitle, .day-title, .day-label, .slot-label, .meta, .day-header, .day-meta, .slot-body').forEach(el => {
+          el.setAttribute('contenteditable', 'true');
+        });
+      }
+    <\/script>
+  `;
+  const toolbar = `
+    <div class="edit-toolbar">
+      <strong style="font-size:14px;">Editing: ${city} Itinerary</strong>
+      <span class="hint">Click any text to edit it</span>
+      <span class="spacer"></span>
+      <button class="add-row-btn" onclick="addDay()">+ Add Day</button>
+      <button class="secondary" onclick="downloadHTML()">Download HTML</button>
+      <button onclick="printPDF()">Save as PDF</button>
+    </div>
+  `;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${city} Itinerary</title><style>${editableCSS}</style></head><body>${toolbar}${body}${editableScript}</body></html>`;
+}
+
 // ─── PUBLIC API ─────────────────────────────────────────────────────────────
 
 export function generatePDFContent(plan: DayPlan[], city: string, vibe: string, opts: PDFExportOptions): string {
@@ -288,6 +374,25 @@ export function generatePDFContent(plan: DayPlan[], city: string, vibe: string, 
     case 'minimal':  return minimalHTML(plan, city, vibe, opts);
     default:         return classicHTML(plan, city, vibe, opts);
   }
+}
+
+export function generateEditableContent(plan: DayPlan[], city: string, vibe: string, opts: PDFExportOptions): string {
+  // Generate the same themed HTML but with editable wrapper
+  let css: string;
+  let body: string;
+
+  // We need to get the css and body separately, so we reconstruct using the same logic
+  // but with the editable base wrapper
+  const html = generatePDFContent(plan, city, vibe, opts);
+  // Extract CSS and body from the generated HTML
+  const cssMatch = html.match(/<style>([\s\S]*?)<\/style>/);
+  const bodyMatch = html.match(/<body>([\s\S]*?)<\/body>/);
+
+  if (cssMatch && bodyMatch) {
+    return editableBase(cssMatch[1], bodyMatch[1], city);
+  }
+  // Fallback: wrap entire HTML
+  return editableBase('', html, city);
 }
 
 export async function exportToPDF(
@@ -304,5 +409,21 @@ export async function exportToPDF(
     printWindow.onload = () => printWindow.print();
   } else {
     throw new Error('Please allow popups to export your itinerary.');
+  }
+}
+
+export async function exportEditablePDF(
+  plan: DayPlan[],
+  city: string,
+  vibe: string,
+  opts: PDFExportOptions,
+): Promise<void> {
+  const html = generateEditableContent(plan, city, vibe, opts);
+  const editWindow = window.open('', '', 'width=960,height=800');
+  if (editWindow) {
+    editWindow.document.write(html);
+    editWindow.document.close();
+  } else {
+    throw new Error('Please allow popups to open the editable itinerary.');
   }
 }
