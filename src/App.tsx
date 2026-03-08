@@ -3,10 +3,8 @@ import { WifiOff } from "lucide-react";
 import Toast, { type ToastData } from "./components/Toast";
 import { useSwipeable } from 'react-swipeable';
 import TopBar from "./components/TopBar";
-import HotelSection from "./components/HotelSection";
 import SuggestionModal from "./components/SuggestionModal";
 import MapPanel from "./components/MapPanel";
-import HeroImage from "./components/HeroImage";
 import Footer from "./components/Footer";
 import ViewToggle from "./components/ViewToggle";
 import {
@@ -36,7 +34,6 @@ import { useHistory } from "./hooks/useHistory";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useOnline } from "./hooks/useOnline";
 import SampleItinerary from "./components/SampleItinerary";
-import TripProgress, { calculateOverallCompletion } from "./components/TripProgress";
 
 // slots in the order they show up on the map
 const SLOT_SEQUENCE: (keyof DayPlan)[] = [
@@ -605,23 +602,30 @@ useEffect(() => {
           setCurrentDay={setCurrentDay}
           budget={budget}
           setBudget={setBudget}
-          completionPercent={city ? calculateOverallCompletion(plan) : undefined}
+          hotel={hotel}
+          setHotel={(h) => {
+            setHotel(h);
+            if (h) {
+              const next = plan.map((d) => ({ ...d }));
+              next[currentDay - 1].hotel = h;
+              setPlan(next);
+            }
+          }}
+          apiBase={API_BASE}
+          onUseForAllDays={(h) => {
+            const next = plan.map((d) => ({ ...d, hotel: h }));
+            setPlan(next);
+            showToast(`"${h.name}" set as hotel for all ${daysCount} days`);
+          }}
+          onSampleItinerary={() => setShowSampleItinerary(true)}
         />
 
-        {/* Hero Image */}
-        {city && <HeroImage city={city} />}
-
-        {/* Smart Defaults */}
+        {/* Smart Defaults (first-time setup) */}
         {showSmartDefaults && (
           <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold">Quick Start</h2>
-              <button 
-                onClick={() => setShowSmartDefaults(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                ×
-              </button>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-sm">Quick Start</h2>
+              <button onClick={() => setShowSmartDefaults(false)} className="text-slate-400 hover:text-slate-600 text-sm">×</button>
             </div>
             <SmartDefaults
               onCitySelect={(newCity) => {
@@ -636,54 +640,7 @@ useEffect(() => {
           </div>
         )}
 
-        <HotelSection
-          city={city}
-          hotel={hotel}
-          setHotel={(h) => {
-            setHotel(h);
-            // Also update current day's hotel slot
-            if (h) {
-              const next = plan.map((d) => ({ ...d }));
-              next[currentDay - 1].hotel = h;
-              setPlan(next);
-            }
-          }}
-          setCity={setCity}
-          apiBase={API_BASE}
-          onSampleItinerary={() => setShowSampleItinerary(true)}
-          onUseForAllDays={(h) => {
-            const next = plan.map((d) => ({ ...d, hotel: h }));
-            setPlan(next);
-            showToast(`"${h.name}" set as hotel for all ${daysCount} days`);
-          }}
-        />
-        
-        {/* Route Optimization Panel */}
-        <RouteOptimizerPanel
-          chosenItems={chosenItems}
-          hotel={hotel}
-          onApply={(optimizedOrder) => {
-            const dayData = { ...currentDayData };
-            const slots = ['breakfast', 'activity', 'lunch', 'activity2', 'coffee', 'dinner'] as const;
-
-            // Clear current non-hotel slots
-            slots.forEach(slot => delete dayData[slot]);
-
-            // Apply optimized order
-            optimizedOrder.forEach((item, i) => {
-              if (slots[i]) {
-                dayData[slots[i]] = item;
-              }
-            });
-
-            const next = [...plan];
-            next[currentDay - 1] = dayData;
-            setPlan(next);
-          }}
-          onToast={(msg) => showToast(msg, 'info')}
-        />
-
-        <div className="grid lg:grid-cols-2 gap-5">
+        <div className="grid lg:grid-cols-2 gap-4">
           <div className={`space-y-4 ${mobileView === 'map' ? 'hidden lg:block' : ''}`}>
             <DragDropDayPlanner
               currentDay={currentDay}
@@ -697,6 +654,23 @@ useEffect(() => {
               daysCount={daysCount}
             />
 
+            {/* Route Optimization (inside left column, below planner) */}
+            <RouteOptimizerPanel
+              chosenItems={chosenItems}
+              hotel={hotel}
+              onApply={(optimizedOrder) => {
+                const dayData = { ...currentDayData };
+                const slots = ['breakfast', 'activity', 'lunch', 'activity2', 'coffee', 'dinner'] as const;
+                slots.forEach(slot => delete dayData[slot]);
+                optimizedOrder.forEach((item, i) => {
+                  if (slots[i]) dayData[slots[i]] = item;
+                });
+                const next = [...plan];
+                next[currentDay - 1] = dayData;
+                setPlan(next);
+              }}
+              onToast={(msg) => showToast(msg, 'info')}
+            />
           </div>
 
           <div className={`${mobileView === 'list' ? 'hidden lg:block' : ''}`}>
@@ -708,7 +682,6 @@ useEffect(() => {
               dirSegs={dirSegs}
               dirErr={dirErr}
               onItemClick={(item) => {
-                // Open details modal for the clicked item
                 setDetailItem(item);
                 setShowDetailModal(true);
               }}
@@ -718,71 +691,6 @@ useEffect(() => {
 
         {/* Mobile View Toggle */}
         <ViewToggle view={mobileView} onViewChange={setMobileView} />
-
-        {/* Trip Progress Tracker */}
-        {city && plan.length > 0 && (
-          <TripProgress
-            plan={plan}
-            currentDay={currentDay}
-            city={city}
-            onDayClick={setCurrentDay}
-          />
-        )}
-
-        {/* Plan view */}
-        <div className="rounded-2xl bg-white/90 backdrop-blur border p-4 shadow-sm" data-print-section>
-          <div className="font-semibold mb-3">Plan View</div>
-          <div className="mt-3 overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-500">
-                  <th className="py-2 pr-4">Day</th>
-                  <th className="py-2 pr-4">Hotel</th>
-                    <th className="py-2 pr-4">Breakfast</th>
-                    <th className="py-2 pr-4">Morning Activity</th>
-                    <th className="py-2 pr-4">Afternoon Activity</th>
-                    <th className="py-2 pr-4">Lunch</th>
-                  <th className="py-2 pr-4">Coffee</th>
-                  <th className="py-2 pr-4">Dinner</th>
-                  <th className="py-2 pr-4">Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plan.map((d, i) => (
-                  <tr key={i} className="border-t align-top">
-                    <td className="py-2 pr-4 font-medium">Day {i + 1}</td>
-                    <td className="py-2 pr-4">
-                      {d.hotel?.name || <span className="text-slate-400">—</span>}
-                    </td>
-                      <td className="py-2 pr-4">
-                        {d.breakfast?.name || <span className="text-slate-400">—</span>}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {d.activity?.name || <span className="text-slate-400">—</span>}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {d.activity2?.name || <span className="text-slate-400">—</span>}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {d.lunch?.name || <span className="text-slate-400">—</span>}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {d.coffee?.name || <span className="text-slate-400">—</span>}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {d.dinner?.name || <span className="text-slate-400">—</span>}
-                      </td>
-                    <td className="py-2 pr-4 max-w-[400px]" title={d.notes}>
-                      <div className="line-clamp-3 text-slate-700 leading-relaxed">
-                        {d.notes || <span className="text-slate-400">—</span>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
 
         <SuggestionModal
           open={slotModalOpen}
