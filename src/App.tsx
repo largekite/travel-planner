@@ -650,7 +650,7 @@ useEffect(() => {
           </div>
         )}
 
-        <div className="grid lg:grid-cols-2 gap-4">
+        <div className="grid lg:grid-cols-[3fr_2fr] gap-4">
           <div className={`space-y-4 ${mobileView === 'map' ? 'hidden lg:block' : ''}`}>
             <DragDropDayPlanner
               currentDay={currentDay}
@@ -684,6 +684,7 @@ useEffect(() => {
           </div>
 
           <div className={`${mobileView === 'list' ? 'hidden lg:block' : ''}`}>
+            <div className="lg:sticky lg:top-4">
             <MapPanel
               currentDay={currentDay}
               city={city}
@@ -696,6 +697,7 @@ useEffect(() => {
                 setShowDetailModal(true);
               }}
             />
+            </div>
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { SelectedItem, DirectionsSegment } from "../lib/types";
-import { Footprints, Car, Navigation, ExternalLink, Maximize2, Locate, Route, MapPin, Clock, ArrowRight } from "lucide-react";
+import { Footprints, Car, Navigation, ExternalLink, Maximize2, Locate, Route, MapPin, Clock, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
 import { SLOT_COLORS } from "../utils/slotColors";
 
 // ─── Geo helpers ────────────────────────────────────────────────────────────
@@ -98,6 +98,7 @@ export default function MapPanel({
   const [travelMode, setTravelMode] = useState<"walk" | "drive">("walk");
   const [highlightedIdx, setHighlightedIdx] = useState<number | null>(null);
   const [showFullRoute, setShowFullRoute] = useState(true);
+  const [showStopList, setShowStopList] = useState(false);
 
   // Build the ordered list of all places (hotel first, then day items)
   const allPlaces = useMemo(() => {
@@ -498,83 +499,77 @@ export default function MapPanel({
         </svg>
       )}
 
-      {/* Interactive place list */}
-      <div className="border-t">
-        {allPlaces.length === 0 && !hotel ? (
-          <div className="px-4 py-6 text-center text-sm text-slate-400">
-            <MapPin className="w-5 h-5 mx-auto mb-2 opacity-40" />
-            No places selected yet. Add stops to see them on the map.
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {allPlaces.map((place, idx) => {
-              const seg = idx > 0 ? segments[idx - 1] : null;
-              const color = SLOT_COLORS[place.slotKey] || "#4F46E5";
-              const slotLabel = SLOT_LABELS[place.slotKey] || place.slotKey;
-
-              return (
-                <React.Fragment key={`${place.name}-${idx}`}>
-                  {/* Distance segment between stops */}
-                  {seg && (
-                    <div className="flex items-center gap-2 px-4 py-1 bg-slate-50 text-[10px] text-slate-400">
-                      <div className="flex-1 border-t border-dashed border-slate-200" />
-                      <div className="flex items-center gap-1">
-                        {seg.km < 1.2 ? <Footprints className="w-2.5 h-2.5" /> : <Car className="w-2.5 h-2.5" />}
-                        <span>{formatDist(seg.km)}</span>
-                        <span>~{seg.mins} min</span>
-                      </div>
-                      <div className="flex-1 border-t border-dashed border-slate-200" />
-                    </div>
-                  )}
-
-                  {/* Place row */}
+      {/* Compact stop list — collapsible */}
+      {allPlaces.length > 0 && (
+        <div className="border-t">
+          <button
+            onClick={() => setShowStopList(!showStopList)}
+            className="w-full flex items-center justify-between px-4 py-2 hover:bg-slate-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              {/* Mini color dots */}
+              <div className="flex items-center -space-x-1">
+                {allPlaces.slice(0, 7).map((place, idx) => (
                   <div
-                    className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
-                      highlightedIdx === idx ? "bg-indigo-50" : "hover:bg-slate-50"
-                    }`}
-                    onClick={() => onItemClick?.(place)}
-                    onMouseEnter={() => setHighlightedIdx(idx)}
-                    onMouseLeave={() => setHighlightedIdx(null)}
-                  >
-                    {/* Numbered badge */}
-                    <div
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
-                      style={{ backgroundColor: color }}
-                    >
-                      {place.slotKey === "hotel" ? "H" : idx}
-                    </div>
+                    key={idx}
+                    className="w-3 h-3 rounded-full border border-white"
+                    style={{ backgroundColor: SLOT_COLORS[place.slotKey] || "#4F46E5" }}
+                  />
+                ))}
+              </div>
+              <span className="text-xs text-slate-500">
+                {allPlaces.length} stop{allPlaces.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            {showStopList
+              ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+              : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            }
+          </button>
 
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-medium uppercase tracking-wider" style={{ color }}>
-                        {slotLabel}
+          {showStopList && (
+            <div className="divide-y divide-slate-100 max-h-[240px] overflow-y-auto">
+              {allPlaces.map((place, idx) => {
+                const seg = idx > 0 ? segments[idx - 1] : null;
+                const color = SLOT_COLORS[place.slotKey] || "#4F46E5";
+                const slotLabel = SLOT_LABELS[place.slotKey] || place.slotKey;
+
+                return (
+                  <React.Fragment key={`${place.name}-${idx}`}>
+                    {seg && (
+                      <div className="flex items-center gap-1.5 px-4 py-0.5 text-[10px] text-slate-300">
+                        <div className="flex-1 border-t border-dashed border-slate-200" />
+                        {seg.km < 1.2 ? <Footprints className="w-2 h-2" /> : <Car className="w-2 h-2" />}
+                        <span>{formatDist(seg.km)} ~{seg.mins}m</span>
+                        <div className="flex-1 border-t border-dashed border-slate-200" />
                       </div>
-                      <div className="text-sm font-medium text-slate-800 truncate">{place.name}</div>
-                      {place.area && (
-                        <div className="text-xs text-slate-500 truncate">{place.area}</div>
-                      )}
-                    </div>
-
-                    {/* External link */}
-                    {place.url && (
-                      <a
-                        href={place.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1 text-slate-400 hover:text-blue-600 flex-shrink-0"
-                        onClick={(e) => e.stopPropagation()}
-                        title="Open in Google Maps"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
                     )}
-                  </div>
-                </React.Fragment>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                    <div
+                      className={`flex items-center gap-2 px-4 py-1.5 cursor-pointer transition-colors ${
+                        highlightedIdx === idx ? "bg-indigo-50" : "hover:bg-slate-50"
+                      }`}
+                      onClick={() => onItemClick?.(place)}
+                      onMouseEnter={() => setHighlightedIdx(idx)}
+                      onMouseLeave={() => setHighlightedIdx(null)}
+                    >
+                      <div
+                        className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0"
+                        style={{ backgroundColor: color }}
+                      >
+                        {place.slotKey === "hotel" ? "H" : idx}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-slate-800 truncate">{place.name}</div>
+                      </div>
+                      <span className="text-[10px] text-slate-400 flex-shrink-0">{slotLabel}</span>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Map footer info */}
       {dirErr && (
