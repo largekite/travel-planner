@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Plus, Copy, Sparkles, ArrowLeftRight, Star, ChevronRight } from 'lucide-react';
+import { X, Plus, Copy, Sparkles, ArrowLeftRight, Star, ChevronRight, FileText } from 'lucide-react';
 import PlacePhoto from './PlacePhoto';
 import { DayPlan, SelectedItem, ApiSuggestion } from '../lib/types';
 import PlaceDetails from './PlaceDetails';
@@ -261,6 +261,16 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
         })}
       </div>
 
+      {/* Day notes */}
+      {currentDayData.notes && (
+        <div className="px-4 py-3 border-t bg-slate-50/50">
+          <div className="flex items-start gap-2">
+            <FileText className="w-3.5 h-3.5 text-slate-400 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-slate-500 leading-relaxed">{currentDayData.notes}</p>
+          </div>
+        </div>
+      )}
+
       {selectedPlace && (
         <PlaceDetails
           place={{
@@ -271,6 +281,7 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
               googleReviews: selectedPlace.googleReviews,
             },
           } as ApiSuggestion}
+          city={city}
           onClose={() => setSelectedPlace(null)}
         />
       )}

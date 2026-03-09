@@ -80,6 +80,11 @@ export default function TopBar({
         lat: it.lat || it.geometry?.location?.lat,
         lng: it.lng || it.geometry?.location?.lng,
         desc: it.desc,
+        placeId: it.placeId,
+        photo: it.photos?.[0],
+        googleRating: it.ratings?.google,
+        googleReviews: it.ratings?.googleReviews,
+        price: it.price,
       })));
     } catch { setHotelResults([]); }
     finally { setHotelSearching(false); }
