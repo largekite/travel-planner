@@ -187,6 +187,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     else if (slot === "dinner") cuisine = "Dinner";
     else if (slot === "coffee") cuisine = "Coffee";
 
+    // Convert Google photo references to usable URLs
+    const photos: string[] = Array.isArray(p.photos)
+      ? p.photos.slice(0, 3).map((ph: any) =>
+          `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${ph.photo_reference}&key=${googleKey}`
+        )
+      : [];
+
     return {
       name,
       url: finalUrl,
@@ -202,6 +209,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         google: p.rating,
         googleReviews: p.user_ratings_total,
       },
+      photos: photos.length > 0 ? photos : undefined,
     };
   }));
 
