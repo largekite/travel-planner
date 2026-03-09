@@ -6,7 +6,7 @@ import PlaceDetails from './PlaceDetails';
 import AffiliateButton from './AffiliateButton';
 import RegenerateButton from './RegenerateButton';
 import { getSlotIcon } from '../utils/slotIcons';
-import { SLOT_COLORS, SLOT_COLOR_CLASSES } from '../utils/slotColors';
+import { SLOT_COLORS } from '../utils/slotColors';
 import { generateHotelsLink, generateViatorLink, generateTripAdvisorLink } from '../utils/affiliateLinks';
 
 type Props = {
@@ -150,11 +150,8 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
       <div className="divide-y">
         {SLOT_ORDER.map((slot) => {
           const item = currentDayData[slot.key as keyof DayPlan] as SelectedItem | undefined;
-          const isHotel = slot.key === 'hotel';
-          const isActivity = slot.key === 'activity' || slot.key === 'activity2';
-          const isFood = ['breakfast', 'lunch', 'dinner', 'coffee'].includes(slot.key);
 
-          const colors = SLOT_COLOR_CLASSES[slot.key] || SLOT_COLOR_CLASSES.activity;
+          const slotColor = SLOT_COLORS[slot.key] || SLOT_COLORS.activity;
 
           if (!item) {
             // Empty slot — color-coded add button
@@ -162,11 +159,14 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
               <button
                 key={slot.key}
                 onClick={() => openSlot(slot.key)}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left hover:${colors.lightBg} transition-colors group border-l-3 border-transparent hover:${colors.border}`}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors group"
+                style={{ borderLeft: `3px solid transparent` }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderLeftColor = slotColor; e.currentTarget.style.backgroundColor = slotColor + '08'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderLeftColor = 'transparent'; e.currentTarget.style.backgroundColor = ''; }}
               >
                 <div
                   className="w-8 h-8 rounded-lg border-2 border-dashed flex items-center justify-center transition-colors"
-                  style={{ borderColor: SLOT_COLORS[slot.key] + '40' }}
+                  style={{ borderColor: slotColor + '40' }}
                 >
                   {getSlotIcon(slot.key, "w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500")}
                 </div>
@@ -182,8 +182,8 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
           return (
             <div
               key={slot.key}
-              className="group py-3 pr-4 pl-3 hover:bg-slate-50/80 transition-colors cursor-pointer border-l-3"
-              style={{ borderLeftColor: SLOT_COLORS[slot.key] }}
+              className="group py-3 pr-4 pl-3 hover:bg-slate-50/80 transition-colors cursor-pointer"
+              style={{ borderLeft: `3px solid ${slotColor}` }}
               onClick={() => setSelectedPlace(item)}
             >
               <div className="flex gap-3">
@@ -192,7 +192,7 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
                   <PlacePhoto src={item.photo} name={item.name ?? slot.label} size={64} rounded="xl" />
                   <div
                     className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full shadow flex items-center justify-center"
-                    style={{ backgroundColor: SLOT_COLORS[slot.key] }}
+                    style={{ backgroundColor: slotColor }}
                   >
                     {getSlotIcon(slot.key, "w-3 h-3 text-white")}
                   </div>
@@ -201,7 +201,7 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[10px] font-medium" style={{ color: SLOT_COLORS[slot.key] }}>{slot.label}</span>
+                    <span className="text-[10px] font-medium" style={{ color: slotColor }}>{slot.label}</span>
                     <span className="text-[10px] text-slate-300">{slot.time}</span>
                   </div>
                   <div className="text-sm font-semibold text-slate-800 truncate">{item.name}</div>

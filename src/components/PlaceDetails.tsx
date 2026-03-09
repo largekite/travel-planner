@@ -40,9 +40,6 @@ export default function PlaceDetails({ place, onClose, onChoose, city }: Props) 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('Full place object:', place);
-    console.log('Place placeId:', place.placeId);
-    
     // Skip API call if no placeId
     if (!place.placeId) {
       setDetails({
