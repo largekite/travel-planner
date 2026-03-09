@@ -140,31 +140,43 @@ export default function PlaceDetails({ place, onClose, onChoose, city }: Props) 
                 </div>
               )}
 
-              {/* Info */}
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Star className="w-4 h-4 text-yellow-500" />
-                    <span>{place.ratings?.google?.toFixed(1)} ({place.ratings?.googleReviews} reviews)</span>
+              {/* Info cards */}
+              <div className="flex flex-wrap gap-2">
+                {place.ratings?.google && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-100">
+                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                    <span className="text-sm font-medium text-amber-800">{place.ratings.google.toFixed(1)}</span>
+                    {place.ratings.googleReviews && (
+                      <span className="text-xs text-amber-600">({place.ratings.googleReviews.toLocaleString()})</span>
+                    )}
                   </div>
-                  {place.price && (
-                    <div className="mb-2">Price: {place.price}</div>
-                  )}
-                </div>
-                <div>
-                  {details?.phone && (
-                    <div className="flex items-center gap-2 mb-2">
-                      <Phone className="w-4 h-4" />
-                      <a href={`tel:${details.phone}`} className="text-blue-600">{details.phone}</a>
-                    </div>
-                  )}
-                  {details?.website && (
-                    <div className="flex items-center gap-2">
-                      <ExternalLink className="w-4 h-4" />
-                      <a href={details.website} target="_blank" rel="noopener" className="text-blue-600">Website</a>
-                    </div>
-                  )}
-                </div>
+                )}
+                {place.price && (
+                  <div className="px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100 text-sm font-medium text-emerald-700">
+                    {place.price}
+                  </div>
+                )}
+                {place.cuisine && (
+                  <div className="px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-sm text-slate-600">
+                    {place.cuisine}
+                  </div>
+                )}
+              </div>
+
+              {/* Contact row */}
+              <div className="flex flex-wrap gap-3 text-sm">
+                {details?.phone && (
+                  <a href={`tel:${details.phone}`} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 transition-colors">
+                    <Phone className="w-3.5 h-3.5" />
+                    {details.phone}
+                  </a>
+                )}
+                {details?.website && (
+                  <a href={details.website} target="_blank" rel="noopener" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors">
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Website
+                  </a>
+                )}
               </div>
 
               {/* Hours */}

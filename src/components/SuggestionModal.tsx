@@ -474,13 +474,23 @@ function ListView({
                 </a>
               )}
             </div>
-            <div className="text-xs text-slate-400 truncate mt-0.5">
-              {[it.cuisine, it.price, it.area].filter(Boolean).join(" · ")}
+            {/* Meta badges */}
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              {it.cuisine && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">{it.cuisine}</span>
+              )}
+              {it.price && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">{it.price}</span>
+              )}
+              {it.area && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-50 text-slate-500">{it.area}</span>
+              )}
             </div>
             {it.desc && (
-              <div className="text-xs text-slate-500 mt-0.5 line-clamp-2">{it.desc}</div>
+              <div className="text-xs text-slate-500 mt-1 line-clamp-2">{it.desc}</div>
             )}
-            <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+            {/* Ratings + distance row */}
+            <div className="flex items-center gap-3 mt-1 flex-wrap">
               {it.ratings?.google && (
                 <div className="flex items-center gap-1">
                   <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
@@ -488,6 +498,17 @@ function ListView({
                     {it.ratings.google.toFixed(1)}
                     {typeof it.ratings.googleReviews === 'number' && (
                       <span className="text-slate-400"> ({it.ratings.googleReviews.toLocaleString()})</span>
+                    )}
+                  </span>
+                </div>
+              )}
+              {it.ratings?.yelp && (
+                <div className="flex items-center gap-1">
+                  <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-red-600 text-white text-[8px] font-bold">Y</span>
+                  <span className="text-[11px] text-slate-500">
+                    {it.ratings.yelp.toFixed(1)}
+                    {typeof it.ratings.yelpReviews === 'number' && (
+                      <span className="text-slate-400"> ({it.ratings.yelpReviews.toLocaleString()})</span>
                     )}
                   </span>
                 </div>

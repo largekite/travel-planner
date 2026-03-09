@@ -615,6 +615,7 @@ useEffect(() => {
             }
           }}
           apiBase={API_BASE}
+          plan={plan}
           onUseForAllDays={(h) => {
             const next = plan.map((d) => ({ ...d, hotel: h }));
             setPlan(next);

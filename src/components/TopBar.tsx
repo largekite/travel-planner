@@ -20,6 +20,7 @@ type Props = {
   budget: Budget;
   setBudget: (b: Budget) => void;
   completionPercent?: number;
+  plan?: Record<string, any>[];
   // Hotel
   hotel: SelectedItem | null;
   setHotel: (h: SelectedItem | null) => void;
@@ -47,6 +48,7 @@ export default function TopBar({
   daysCount, setDaysCount,
   currentDay, setCurrentDay,
   budget, setBudget,
+  plan,
   hotel, setHotel,
   apiBase,
   onUseForAllDays,
@@ -241,19 +243,35 @@ export default function TopBar({
           )}
 
           <div className="flex gap-1 overflow-x-auto">
-            {Array.from({ length: daysCount }, (_, i) => i + 1).map((d) => (
-              <button
-                key={d}
-                onClick={() => setCurrentDay(d)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-                  currentDay === d
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "text-slate-600 hover:bg-white"
-                }`}
-              >
-                {d}
-              </button>
-            ))}
+            {Array.from({ length: daysCount }, (_, i) => i + 1).map((d) => {
+              const dayData = plan?.[d - 1] || {};
+              const slotKeys = ['hotel', 'breakfast', 'activity', 'lunch', 'activity2', 'coffee', 'dinner'];
+              const filled = slotKeys.filter(k => dayData[k] && typeof dayData[k] === 'object' && 'name' in dayData[k]).length;
+              const total = slotKeys.length;
+              const isCurrent = currentDay === d;
+              return (
+                <button
+                  key={d}
+                  onClick={() => setCurrentDay(d)}
+                  className={`relative px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                    isCurrent
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-white"
+                  }`}
+                >
+                  {d}
+                  {filled > 0 && (
+                    <span
+                      className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border ${
+                        filled >= total
+                          ? (isCurrent ? 'bg-emerald-400 border-indigo-600' : 'bg-emerald-400 border-slate-50')
+                          : (isCurrent ? 'bg-amber-400 border-indigo-600' : 'bg-amber-400 border-slate-50')
+                      }`}
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {daysCount > 7 && (

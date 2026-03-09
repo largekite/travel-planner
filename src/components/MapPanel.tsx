@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { SelectedItem, DirectionsSegment } from "../lib/types";
 import { Footprints, Car, Navigation, ExternalLink, Maximize2, Locate, Route, MapPin, Clock, ArrowRight } from "lucide-react";
+import { SLOT_COLORS } from "../utils/slotColors";
 
 // ─── Geo helpers ────────────────────────────────────────────────────────────
 
@@ -26,15 +27,7 @@ function formatDist(km: number) {
 
 // ─── Slot colors & labels ───────────────────────────────────────────────────
 
-const SLOT_COLORS: Record<string, string> = {
-  hotel: "#f59e0b",
-  breakfast: "#f97316",
-  activity: "#3b82f6",
-  activity2: "#8b5cf6",
-  lunch: "#10b981",
-  coffee: "#6366f1",
-  dinner: "#e11d48",
-};
+// SLOT_COLORS imported from shared utils
 
 const SLOT_LABELS: Record<string, string> = {
   hotel: "Hotel",
