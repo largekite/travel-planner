@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Star, Clock, Phone, ExternalLink, MapPin, Award, ArrowLeft, Plus } from "lucide-react";
+import { Star, Clock, Phone, ExternalLink, MapPin, Award, ArrowLeft, Plus, Loader2 } from "lucide-react";
 import { ApiSuggestion } from "../lib/types";
 
 type Props = {
@@ -125,14 +125,17 @@ export default function PlaceDetails({ place, onClose, onChoose, city }: Props) 
 
         <div className="overflow-y-auto max-h-[60vh]">
           {loading ? (
-            <div className="p-4 text-center">Loading details...</div>
+            <div className="p-8 flex flex-col items-center gap-2 text-slate-400">
+              <Loader2 className="w-6 h-6 animate-spin" />
+              <span className="text-sm">Loading photos & reviews...</span>
+            </div>
           ) : (
             <div className="p-4 space-y-4">
-              {/* Photos */}
-              {details?.photos && (
-                <div className="grid grid-cols-2 gap-2">
+              {/* Photos — responsive: 1 col on mobile, 2 on wider */}
+              {details?.photos && details.photos.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {details.photos.map((photo, i) => (
-                    <img key={i} src={photo} alt="" className="rounded-lg w-full h-32 object-cover" />
+                    <img key={i} src={photo} alt="" className="rounded-lg w-full h-40 sm:h-32 object-cover" />
                   ))}
                 </div>
               )}

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { X, Footprints, Car, ExternalLink, Map as MapIcon, List, Star, Plus, Sliders } from "lucide-react";
+import { X, Footprints, Car, ExternalLink, Map as MapIcon, List, Star, Plus, Sliders, MapPin } from "lucide-react";
 import { ApiSuggestion, SelectedItem, Budget } from "../lib/types";
 import PlacePhoto from "./PlacePhoto";
 import AutocompleteInput from "./AutocompleteInput";
@@ -355,6 +355,7 @@ export default function SuggestionModal({
                 }
               }}
               filters={filters}
+              hotel={hotel}
             />
           ) : (
             <MapView
@@ -398,7 +399,8 @@ function ListView({
   onChoose,
   onViewDetails,
   onAddToCompare,
-  filters
+  filters,
+  hotel
 }: {
   items: ApiSuggestion[];
   loading: boolean;
@@ -407,6 +409,7 @@ function ListView({
   onViewDetails: (i: ApiSuggestion) => void;
   onAddToCompare: (i: ApiSuggestion) => void;
   filters: FilterState;
+  hotel: SelectedItem | null;
 }) {
   // Apply filters
   const filteredItems = items.filter(item => {
@@ -475,19 +478,29 @@ function ListView({
               {[it.cuisine, it.price, it.area].filter(Boolean).join(" · ")}
             </div>
             {it.desc && (
-              <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{it.desc}</div>
+              <div className="text-xs text-slate-500 mt-0.5 line-clamp-2">{it.desc}</div>
             )}
-            {it.ratings?.google && (
-              <div className="flex items-center gap-1 mt-0.5">
-                <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                <span className="text-[11px] text-slate-500">
-                  {it.ratings.google.toFixed(1)}
-                  {typeof it.ratings.googleReviews === 'number' && (
-                    <span className="text-slate-400"> ({it.ratings.googleReviews.toLocaleString()})</span>
-                  )}
-                </span>
-              </div>
-            )}
+            <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+              {it.ratings?.google && (
+                <div className="flex items-center gap-1">
+                  <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                  <span className="text-[11px] text-slate-500">
+                    {it.ratings.google.toFixed(1)}
+                    {typeof it.ratings.googleReviews === 'number' && (
+                      <span className="text-slate-400"> ({it.ratings.googleReviews.toLocaleString()})</span>
+                    )}
+                  </span>
+                </div>
+              )}
+              {hotel?.lat && hotel?.lng && it.lat && it.lng && (
+                <div className="flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-slate-400" />
+                  <span className="text-[11px] text-slate-400">
+                    {haversineKm(hotel.lat, hotel.lng, it.lat, it.lng).toFixed(1)} km
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Actions */}

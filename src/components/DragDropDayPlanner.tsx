@@ -79,13 +79,14 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
   return (
     <div className="rounded-2xl bg-white/90 backdrop-blur border shadow-sm overflow-visible">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b">
-        <div className="flex items-center gap-2">
-          <h2 className="font-semibold text-sm">Day {currentDay}</h2>
-          <span className="text-xs text-slate-400">{filledCount}/{SLOT_ORDER.length}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {filledCount > 0 && daysCount && daysCount > 1 && (
+      <div className="px-4 py-3 border-b">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="font-semibold text-sm">Day {currentDay}</h2>
+            <span className="text-xs text-slate-400">{filledCount}/{SLOT_ORDER.length}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {filledCount > 0 && daysCount && daysCount > 1 && (
             <div className="relative">
               <button
                 onClick={() => setShowCopyMenu(!showCopyMenu)}
@@ -124,8 +125,25 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
               {loadingProgress && loadingProgress > 0 ? 'Filling...' : 'Auto-fill'}
             </button>
           )}
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-indigo-500 rounded-full transition-all duration-300"
+            style={{ width: `${(filledCount / SLOT_ORDER.length) * 100}%` }}
+          />
         </div>
       </div>
+
+      {/* Empty state */}
+      {filledCount === 0 && !loadingProgress && (
+        <div className="px-4 py-6 text-center border-b">
+          <p className="text-sm text-slate-500">No places added yet</p>
+          <p className="text-xs text-slate-400 mt-1">Tap a slot below or use Auto-fill to get started</p>
+        </div>
+      )}
 
       {/* Slots */}
       <div className="divide-y">
