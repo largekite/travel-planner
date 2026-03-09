@@ -1,13 +1,10 @@
 import { useState } from 'react';
 import { X, Plus, Copy, Sparkles, ArrowLeftRight, Star, ChevronRight } from 'lucide-react';
 import PlacePhoto from './PlacePhoto';
-import { DayPlan, SelectedItem } from '../lib/types';
+import { DayPlan, SelectedItem, ApiSuggestion } from '../lib/types';
 import PlaceDetails from './PlaceDetails';
-import AffiliateButton from './AffiliateButton';
-import RegenerateButton from './RegenerateButton';
 import { getSlotIcon } from '../utils/slotIcons';
 import { SLOT_COLORS } from '../utils/slotColors';
-import { generateHotelsLink, generateViatorLink, generateTripAdvisorLink } from '../utils/affiliateLinks';
 
 type Props = {
   currentDay: number;
@@ -265,7 +262,17 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
       </div>
 
       {selectedPlace && (
-        <PlaceDetails place={selectedPlace} onClose={() => setSelectedPlace(null)} />
+        <PlaceDetails
+          place={{
+            ...selectedPlace,
+            photos: selectedPlace.photo ? [selectedPlace.photo] : undefined,
+            ratings: {
+              google: selectedPlace.googleRating,
+              googleReviews: selectedPlace.googleReviews,
+            },
+          } as ApiSuggestion}
+          onClose={() => setSelectedPlace(null)}
+        />
       )}
     </div>
   );

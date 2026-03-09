@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useCallback } from "react";
 import { X, Footprints, Car, ExternalLink, Map as MapIcon, List, Star, Plus, Sliders, MapPin } from "lucide-react";
 import { ApiSuggestion, SelectedItem, Budget } from "../lib/types";
 import PlacePhoto from "./PlacePhoto";
@@ -573,7 +573,16 @@ function MapView({
     useState<google.maps.DirectionsResult | null>(null);
   const [directionsError, setDirectionsError] = useState<string | null>(null);
 
+  // Track which directions request we've already fetched to prevent infinite re-renders
+  const lastDirectionsKey = useRef<string>("");
+
   const valid = items.filter((p) => p.lat != null && p.lng != null);
+
+  // Stable key for the current set of directions inputs
+  const directionsKey = useMemo(() => {
+    if (valid.length < 2) return "";
+    return valid.map(p => `${p.lat},${p.lng}`).join("|") + "|" + mode;
+  }, [valid.length >= 2 ? valid.map(p => `${p.lat},${p.lng}`).join("|") : "", mode]);
   const fallback = { lat: 38.627, lng: -90.1994 }; // STL-ish
 
   const center =
@@ -599,20 +608,6 @@ function MapView({
     });
     if (added) map.fitBounds(b, 48);
   };
-
-  // recompute route whenever items change (2+ only)
-  const origin = valid[0];
-  const destination = valid[valid.length - 1];
-  const waypoints =
-    valid.length > 2
-      ? valid.slice(1, -1).map((p) => ({
-          location: { lat: p.lat!, lng: p.lng! },
-          stopover: true,
-        }))
-      : [];
-
-  const travelMode: google.maps.TravelMode =
-    mode === "WALKING" ? google.maps.TravelMode.WALKING : google.maps.TravelMode.DRIVING;
 
   if (loadError)
     return (
@@ -738,49 +733,47 @@ function MapView({
           </InfoWindow>
         )}
 
-        {/* Optional: directions across the suggestions (in order) */}
-        {valid.length >= 2 && (
-          <>
-            <DirectionsService
-              options={{
-                origin: { lat: valid[0].lat!, lng: valid[0].lng! },
-                destination: {
-                  lat: valid[valid.length - 1].lat!,
-                  lng: valid[valid.length - 1].lng!,
-                },
-                travelMode:
-                  mode === "WALKING"
-                    ? google.maps.TravelMode.WALKING
-                    : google.maps.TravelMode.DRIVING,
-                waypoints:
-                  valid.length > 2
-                    ? valid.slice(1, -1).map((p) => ({
-                        location: { lat: p.lat!, lng: p.lng! },
-                        stopover: true,
-                      }))
-                    : [],
-                optimizeWaypoints: false,
-              }}
-              callback={(res, status) => {
-                if (!res || !status) return;
-                if (status === "OK") {
-                  setDirections(res);
-                  setDirectionsError(null);
-                  // refit bounds when we have directions
-                  if (map) {
-                    const b = new google.maps.LatLngBounds();
-                    res.routes[0].overview_path.forEach((pt) => b.extend(pt));
-                    map.fitBounds(b, 48);
-                  }
-                } else {
-                  setDirections(null);
-                  setDirectionsError(status);
+        {/* Directions across the suggestions — only fetch when inputs change */}
+        {valid.length >= 2 && directionsKey && directionsKey !== lastDirectionsKey.current && (
+          <DirectionsService
+            options={{
+              origin: { lat: valid[0].lat!, lng: valid[0].lng! },
+              destination: {
+                lat: valid[valid.length - 1].lat!,
+                lng: valid[valid.length - 1].lng!,
+              },
+              travelMode:
+                mode === "WALKING"
+                  ? google.maps.TravelMode.WALKING
+                  : google.maps.TravelMode.DRIVING,
+              waypoints:
+                valid.length > 2
+                  ? valid.slice(1, -1).map((p) => ({
+                      location: { lat: p.lat!, lng: p.lng! },
+                      stopover: true,
+                    }))
+                  : [],
+              optimizeWaypoints: false,
+            }}
+            callback={(res, status) => {
+              if (!res || !status) return;
+              lastDirectionsKey.current = directionsKey;
+              if (status === "OK") {
+                setDirections(res);
+                setDirectionsError(null);
+                if (map) {
+                  const b = new google.maps.LatLngBounds();
+                  res.routes[0].overview_path.forEach((pt) => b.extend(pt));
+                  map.fitBounds(b, 48);
                 }
-              }}
-            />
-            {directions && <DirectionsRenderer options={{ directions }} />}
-          </>
+              } else {
+                setDirections(null);
+                setDirectionsError(status);
+              }
+            }}
+          />
         )}
+        {directions && <DirectionsRenderer options={{ directions }} />}
       </GoogleMap>
 
       {directionsError && (
