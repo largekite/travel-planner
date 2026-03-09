@@ -509,10 +509,16 @@ useEffect(() => {
             name: availableItem.name,
             url: availableItem.url,
             area: availableItem.area,
+            cuisine: availableItem.cuisine,
+            price: availableItem.price,
             lat: availableItem.lat,
             lng: availableItem.lng,
-            desc: availableItem.desc
-          };
+            desc: availableItem.desc,
+            placeId: availableItem.placeId,
+            photo: availableItem.photos?.[0],
+            googleRating: availableItem.ratings?.google,
+            googleReviews: availableItem.ratings?.googleReviews,
+          } satisfies SelectedItem;
         }
       });
 
