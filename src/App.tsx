@@ -231,6 +231,9 @@ export default function App() {
       desc: item.desc,
       meta: item.meta,
       photo: item.photos?.[0],
+      placeId: item.placeId,
+      googleRating: item.ratings?.google,
+      googleReviews: item.ratings?.googleReviews,
     };
 
     // 1) set the slot

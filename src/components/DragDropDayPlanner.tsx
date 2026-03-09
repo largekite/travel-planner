@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Plus, Copy, Sparkles, ArrowLeftRight } from 'lucide-react';
+import { X, Plus, Copy, Sparkles, ArrowLeftRight, Star, ChevronRight } from 'lucide-react';
 import PlacePhoto from './PlacePhoto';
 import { DayPlan, SelectedItem } from '../lib/types';
 import PlaceDetails from './PlaceDetails';
@@ -154,48 +154,73 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
             );
           }
 
-          // Filled slot
+          // Filled slot — rich card
           return (
             <div
               key={slot.key}
-              className="group flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors"
+              className="group px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer"
+              onClick={() => setSelectedPlace(item)}
             >
-              {/* Photo */}
-              <div className="relative flex-shrink-0">
-                <PlacePhoto src={item.photo} name={item.name ?? slot.label} size={36} rounded="lg" />
-                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-white shadow flex items-center justify-center">
-                  {getSlotIcon(slot.key, "w-2.5 h-2.5 text-indigo-600")}
+              <div className="flex gap-3">
+                {/* Photo — larger */}
+                <div className="relative flex-shrink-0">
+                  <PlacePhoto src={item.photo} name={item.name ?? slot.label} size={64} rounded="xl" />
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white shadow flex items-center justify-center">
+                    {getSlotIcon(slot.key, "w-3 h-3 text-indigo-600")}
+                  </div>
                 </div>
-              </div>
 
-              {/* Time */}
-              <span className="text-[10px] text-slate-400 w-12 flex-shrink-0">{slot.time}</span>
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-[10px] text-slate-400">{slot.time}</span>
+                  </div>
+                  <div className="text-sm font-semibold text-slate-800 truncate">{item.name}</div>
 
-              {/* Content */}
-              <div
-                className="flex-1 min-w-0 cursor-pointer"
-                onClick={() => setSelectedPlace(item)}
-              >
-                <div className="text-sm font-medium text-slate-800 truncate">{item.name}</div>
-                {item.area && <div className="text-[10px] text-slate-400 truncate">{item.area}</div>}
-              </div>
+                  {/* Meta line: cuisine · price · area */}
+                  <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                    {[item.cuisine, item.price, item.area].filter(Boolean).join(' · ')}
+                  </div>
 
-              {/* Actions — always visible */}
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <button
-                  onClick={() => openSlot(slot.key)}
-                  className="p-1 text-slate-400 hover:text-indigo-600 transition-colors"
-                  title={`Change ${slot.label}`}
-                >
-                  <ArrowLeftRight className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => removeItem(slot.key)}
-                  className="p-1 text-slate-400 hover:text-red-500 transition-colors"
-                  title={`Remove ${slot.label}`}
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                  {/* Rating + "View details" row */}
+                  <div className="flex items-center gap-3 mt-1">
+                    {item.googleRating && (
+                      <div className="flex items-center gap-1">
+                        <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                        <span className="text-[11px] font-medium text-slate-600">{item.googleRating.toFixed(1)}</span>
+                        {typeof item.googleReviews === 'number' && (
+                          <span className="text-[10px] text-slate-400">({item.googleReviews.toLocaleString()})</span>
+                        )}
+                      </div>
+                    )}
+                    <span className="text-[10px] text-indigo-500 flex items-center gap-0.5">
+                      Details <ChevronRight className="w-3 h-3" />
+                    </span>
+                  </div>
+
+                  {/* Description snippet */}
+                  {item.desc && (
+                    <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">{item.desc}</p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-col items-center gap-1 flex-shrink-0 pt-3">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openSlot(slot.key); }}
+                    className="p-1 text-slate-400 hover:text-indigo-600 transition-colors"
+                    title={`Change ${slot.label}`}
+                  >
+                    <ArrowLeftRight className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeItem(slot.key); }}
+                    className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+                    title={`Remove ${slot.label}`}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           );
