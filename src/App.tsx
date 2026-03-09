@@ -594,7 +594,7 @@ useEffect(() => {
           </div>
         )}
         
-        <div className="max-w-6xl mx-auto space-y-5">
+        <div className="max-w-7xl mx-auto space-y-5">
         <TopBar
           country={country}
           setCountry={setCountry}
@@ -835,7 +835,15 @@ useEffect(() => {
         {/* Place details modal from map click */}
         {showDetailModal && detailItem && (
           <PlaceDetails
-            place={detailItem}
+            place={{
+              ...detailItem,
+              photos: detailItem.photo ? [detailItem.photo] : undefined,
+              ratings: {
+                google: detailItem.googleRating,
+                googleReviews: detailItem.googleReviews,
+              },
+            } as ApiSuggestion}
+            city={city}
             onClose={() => {
               setShowDetailModal(false);
               setDetailItem(null);
