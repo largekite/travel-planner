@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { X, Footprints, Car, ExternalLink, Map as MapIcon, List, Star, Plus, Sliders } from "lucide-react";
+import React, { useMemo, useState, useRef, useCallback } from "react";
+import { X, Footprints, Car, ExternalLink, Map as MapIcon, List, Star, Plus, Sliders, MapPin } from "lucide-react";
 import { ApiSuggestion, SelectedItem, Budget } from "../lib/types";
 import PlacePhoto from "./PlacePhoto";
 import AutocompleteInput from "./AutocompleteInput";
@@ -355,6 +355,7 @@ export default function SuggestionModal({
                 }
               }}
               filters={filters}
+              hotel={hotel}
             />
           ) : (
             <MapView
@@ -398,7 +399,8 @@ function ListView({
   onChoose,
   onViewDetails,
   onAddToCompare,
-  filters
+  filters,
+  hotel
 }: {
   items: ApiSuggestion[];
   loading: boolean;
@@ -407,6 +409,7 @@ function ListView({
   onViewDetails: (i: ApiSuggestion) => void;
   onAddToCompare: (i: ApiSuggestion) => void;
   filters: FilterState;
+  hotel: SelectedItem | null;
 }) {
   // Apply filters
   const filteredItems = items.filter(item => {
@@ -471,23 +474,54 @@ function ListView({
                 </a>
               )}
             </div>
-            <div className="text-xs text-slate-400 truncate mt-0.5">
-              {[it.cuisine, it.price, it.area].filter(Boolean).join(" · ")}
+            {/* Meta badges */}
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              {it.cuisine && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">{it.cuisine}</span>
+              )}
+              {it.price && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">{it.price}</span>
+              )}
+              {it.area && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-50 text-slate-500">{it.area}</span>
+              )}
             </div>
             {it.desc && (
-              <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{it.desc}</div>
+              <div className="text-xs text-slate-500 mt-1 line-clamp-2">{it.desc}</div>
             )}
-            {it.ratings?.google && (
-              <div className="flex items-center gap-1 mt-0.5">
-                <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                <span className="text-[11px] text-slate-500">
-                  {it.ratings.google.toFixed(1)}
-                  {typeof it.ratings.googleReviews === 'number' && (
-                    <span className="text-slate-400"> ({it.ratings.googleReviews.toLocaleString()})</span>
-                  )}
-                </span>
-              </div>
-            )}
+            {/* Ratings + distance row */}
+            <div className="flex items-center gap-3 mt-1 flex-wrap">
+              {it.ratings?.google && (
+                <div className="flex items-center gap-1">
+                  <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                  <span className="text-[11px] text-slate-500">
+                    {it.ratings.google.toFixed(1)}
+                    {typeof it.ratings.googleReviews === 'number' && (
+                      <span className="text-slate-400"> ({it.ratings.googleReviews.toLocaleString()})</span>
+                    )}
+                  </span>
+                </div>
+              )}
+              {it.ratings?.yelp && (
+                <div className="flex items-center gap-1">
+                  <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-red-600 text-white text-[8px] font-bold">Y</span>
+                  <span className="text-[11px] text-slate-500">
+                    {it.ratings.yelp.toFixed(1)}
+                    {typeof it.ratings.yelpReviews === 'number' && (
+                      <span className="text-slate-400"> ({it.ratings.yelpReviews.toLocaleString()})</span>
+                    )}
+                  </span>
+                </div>
+              )}
+              {hotel?.lat && hotel?.lng && it.lat && it.lng && (
+                <div className="flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-slate-400" />
+                  <span className="text-[11px] text-slate-400">
+                    {haversineKm(hotel.lat, hotel.lng, it.lat, it.lng).toFixed(1)} km
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Actions */}
@@ -539,7 +573,16 @@ function MapView({
     useState<google.maps.DirectionsResult | null>(null);
   const [directionsError, setDirectionsError] = useState<string | null>(null);
 
+  // Track which directions request we've already fetched to prevent infinite re-renders
+  const lastDirectionsKey = useRef<string>("");
+
   const valid = items.filter((p) => p.lat != null && p.lng != null);
+
+  // Stable key for the current set of directions inputs
+  const directionsKey = useMemo(() => {
+    if (valid.length < 2) return "";
+    return valid.map(p => `${p.lat},${p.lng}`).join("|") + "|" + mode;
+  }, [valid.length >= 2 ? valid.map(p => `${p.lat},${p.lng}`).join("|") : "", mode]);
   const fallback = { lat: 38.627, lng: -90.1994 }; // STL-ish
 
   const center =
@@ -565,20 +608,6 @@ function MapView({
     });
     if (added) map.fitBounds(b, 48);
   };
-
-  // recompute route whenever items change (2+ only)
-  const origin = valid[0];
-  const destination = valid[valid.length - 1];
-  const waypoints =
-    valid.length > 2
-      ? valid.slice(1, -1).map((p) => ({
-          location: { lat: p.lat!, lng: p.lng! },
-          stopover: true,
-        }))
-      : [];
-
-  const travelMode: google.maps.TravelMode =
-    mode === "WALKING" ? google.maps.TravelMode.WALKING : google.maps.TravelMode.DRIVING;
 
   if (loadError)
     return (
@@ -704,49 +733,47 @@ function MapView({
           </InfoWindow>
         )}
 
-        {/* Optional: directions across the suggestions (in order) */}
-        {valid.length >= 2 && (
-          <>
-            <DirectionsService
-              options={{
-                origin: { lat: valid[0].lat!, lng: valid[0].lng! },
-                destination: {
-                  lat: valid[valid.length - 1].lat!,
-                  lng: valid[valid.length - 1].lng!,
-                },
-                travelMode:
-                  mode === "WALKING"
-                    ? google.maps.TravelMode.WALKING
-                    : google.maps.TravelMode.DRIVING,
-                waypoints:
-                  valid.length > 2
-                    ? valid.slice(1, -1).map((p) => ({
-                        location: { lat: p.lat!, lng: p.lng! },
-                        stopover: true,
-                      }))
-                    : [],
-                optimizeWaypoints: false,
-              }}
-              callback={(res, status) => {
-                if (!res || !status) return;
-                if (status === "OK") {
-                  setDirections(res);
-                  setDirectionsError(null);
-                  // refit bounds when we have directions
-                  if (map) {
-                    const b = new google.maps.LatLngBounds();
-                    res.routes[0].overview_path.forEach((pt) => b.extend(pt));
-                    map.fitBounds(b, 48);
-                  }
-                } else {
-                  setDirections(null);
-                  setDirectionsError(status);
+        {/* Directions across the suggestions — only fetch when inputs change */}
+        {valid.length >= 2 && directionsKey && directionsKey !== lastDirectionsKey.current && (
+          <DirectionsService
+            options={{
+              origin: { lat: valid[0].lat!, lng: valid[0].lng! },
+              destination: {
+                lat: valid[valid.length - 1].lat!,
+                lng: valid[valid.length - 1].lng!,
+              },
+              travelMode:
+                mode === "WALKING"
+                  ? google.maps.TravelMode.WALKING
+                  : google.maps.TravelMode.DRIVING,
+              waypoints:
+                valid.length > 2
+                  ? valid.slice(1, -1).map((p) => ({
+                      location: { lat: p.lat!, lng: p.lng! },
+                      stopover: true,
+                    }))
+                  : [],
+              optimizeWaypoints: false,
+            }}
+            callback={(res, status) => {
+              if (!res || !status) return;
+              lastDirectionsKey.current = directionsKey;
+              if (status === "OK") {
+                setDirections(res);
+                setDirectionsError(null);
+                if (map) {
+                  const b = new google.maps.LatLngBounds();
+                  res.routes[0].overview_path.forEach((pt) => b.extend(pt));
+                  map.fitBounds(b, 48);
                 }
-              }}
-            />
-            {directions && <DirectionsRenderer options={{ directions }} />}
-          </>
+              } else {
+                setDirections(null);
+                setDirectionsError(status);
+              }
+            }}
+          />
         )}
+        {directions && <DirectionsRenderer options={{ directions }} />}
       </GoogleMap>
 
       {directionsError && (

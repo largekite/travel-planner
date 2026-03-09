@@ -25,6 +25,10 @@ export type SelectedItem = {
   placeId?: string;
   /** First available photo URL, shown as thumbnail in the planner */
   photo?: string;
+  /** Google rating (e.g. 4.5) */
+  googleRating?: number;
+  /** Total Google review count */
+  googleReviews?: number;
 };
 
 export type DayPlan = {

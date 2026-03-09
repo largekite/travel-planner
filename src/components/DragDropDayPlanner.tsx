@@ -1,12 +1,10 @@
 import { useState } from 'react';
-import { X, Plus, Copy, Sparkles, ArrowLeftRight } from 'lucide-react';
+import { X, Plus, Copy, Sparkles, ArrowLeftRight, Star, ChevronRight } from 'lucide-react';
 import PlacePhoto from './PlacePhoto';
-import { DayPlan, SelectedItem } from '../lib/types';
+import { DayPlan, SelectedItem, ApiSuggestion } from '../lib/types';
 import PlaceDetails from './PlaceDetails';
-import AffiliateButton from './AffiliateButton';
-import RegenerateButton from './RegenerateButton';
 import { getSlotIcon } from '../utils/slotIcons';
-import { generateHotelsLink, generateViatorLink, generateTripAdvisorLink } from '../utils/affiliateLinks';
+import { SLOT_COLORS } from '../utils/slotColors';
 
 type Props = {
   currentDay: number;
@@ -79,13 +77,14 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
   return (
     <div className="rounded-2xl bg-white/90 backdrop-blur border shadow-sm overflow-visible">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b">
-        <div className="flex items-center gap-2">
-          <h2 className="font-semibold text-sm">Day {currentDay}</h2>
-          <span className="text-xs text-slate-400">{filledCount}/{SLOT_ORDER.length}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {filledCount > 0 && daysCount && daysCount > 1 && (
+      <div className="px-4 py-3 border-b">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="font-semibold text-sm">Day {currentDay}</h2>
+            <span className="text-xs text-slate-400">{filledCount}/{SLOT_ORDER.length}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {filledCount > 0 && daysCount && daysCount > 1 && (
             <div className="relative">
               <button
                 onClick={() => setShowCopyMenu(!showCopyMenu)}
@@ -124,78 +123,138 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
               {loadingProgress && loadingProgress > 0 ? 'Filling...' : 'Auto-fill'}
             </button>
           )}
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-indigo-500 rounded-full transition-all duration-300"
+            style={{ width: `${(filledCount / SLOT_ORDER.length) * 100}%` }}
+          />
         </div>
       </div>
+
+      {/* Empty state */}
+      {filledCount === 0 && !loadingProgress && (
+        <div className="px-4 py-6 text-center border-b">
+          <p className="text-sm text-slate-500">No places added yet</p>
+          <p className="text-xs text-slate-400 mt-1">Tap a slot below or use Auto-fill to get started</p>
+        </div>
+      )}
 
       {/* Slots */}
       <div className="divide-y">
         {SLOT_ORDER.map((slot) => {
           const item = currentDayData[slot.key as keyof DayPlan] as SelectedItem | undefined;
-          const isHotel = slot.key === 'hotel';
-          const isActivity = slot.key === 'activity' || slot.key === 'activity2';
-          const isFood = ['breakfast', 'lunch', 'dinner', 'coffee'].includes(slot.key);
+
+          const slotColor = SLOT_COLORS[slot.key] || SLOT_COLORS.activity;
 
           if (!item) {
-            // Empty slot — compact add button
+            // Empty slot — color-coded add button
             return (
               <button
                 key={slot.key}
                 onClick={() => openSlot(slot.key)}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50 transition-colors group"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors group"
+                style={{ borderLeft: `3px solid transparent` }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderLeftColor = slotColor; e.currentTarget.style.backgroundColor = slotColor + '08'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderLeftColor = 'transparent'; e.currentTarget.style.backgroundColor = ''; }}
               >
-                <div className="w-8 h-8 rounded-lg border-2 border-dashed border-slate-200 group-hover:border-indigo-300 flex items-center justify-center">
-                  <Plus className="w-3.5 h-3.5 text-slate-300 group-hover:text-indigo-500" />
+                <div
+                  className="w-8 h-8 rounded-lg border-2 border-dashed flex items-center justify-center transition-colors"
+                  style={{ borderColor: slotColor + '40' }}
+                >
+                  {getSlotIcon(slot.key, "w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500")}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <span className="text-xs text-slate-400 group-hover:text-indigo-600">{slot.label}</span>
+                  <span className="text-xs text-slate-400 group-hover:text-slate-600">{slot.label}</span>
                 </div>
                 <span className="text-[10px] text-slate-300">{slot.time}</span>
               </button>
             );
           }
 
-          // Filled slot
+          // Filled slot — color-coded rich card
           return (
             <div
               key={slot.key}
-              className="group flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors"
+              className="group py-3 pr-4 pl-3 hover:bg-slate-50/80 transition-colors cursor-pointer"
+              style={{ borderLeft: `3px solid ${slotColor}` }}
+              onClick={() => setSelectedPlace(item)}
             >
-              {/* Photo */}
-              <div className="relative flex-shrink-0">
-                <PlacePhoto src={item.photo} name={item.name ?? slot.label} size={36} rounded="lg" />
-                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-white shadow flex items-center justify-center">
-                  {getSlotIcon(slot.key, "w-2.5 h-2.5 text-indigo-600")}
+              <div className="flex gap-3">
+                {/* Photo */}
+                <div className="relative flex-shrink-0">
+                  <PlacePhoto src={item.photo} name={item.name ?? slot.label} size={64} rounded="xl" />
+                  <div
+                    className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full shadow flex items-center justify-center"
+                    style={{ backgroundColor: slotColor }}
+                  >
+                    {getSlotIcon(slot.key, "w-3 h-3 text-white")}
+                  </div>
                 </div>
-              </div>
 
-              {/* Time */}
-              <span className="text-[10px] text-slate-400 w-12 flex-shrink-0">{slot.time}</span>
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-[10px] font-medium" style={{ color: slotColor }}>{slot.label}</span>
+                    <span className="text-[10px] text-slate-300">{slot.time}</span>
+                  </div>
+                  <div className="text-sm font-semibold text-slate-800 truncate">{item.name}</div>
 
-              {/* Content */}
-              <div
-                className="flex-1 min-w-0 cursor-pointer"
-                onClick={() => setSelectedPlace(item)}
-              >
-                <div className="text-sm font-medium text-slate-800 truncate">{item.name}</div>
-                {item.area && <div className="text-[10px] text-slate-400 truncate">{item.area}</div>}
-              </div>
+                  {/* Meta badges */}
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    {item.cuisine && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">{item.cuisine}</span>
+                    )}
+                    {item.price && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">{item.price}</span>
+                    )}
+                    {item.area && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-50 text-slate-500">{item.area}</span>
+                    )}
+                  </div>
 
-              {/* Actions — always visible */}
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <button
-                  onClick={() => openSlot(slot.key)}
-                  className="p-1 text-slate-400 hover:text-indigo-600 transition-colors"
-                  title={`Change ${slot.label}`}
-                >
-                  <ArrowLeftRight className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => removeItem(slot.key)}
-                  className="p-1 text-slate-400 hover:text-red-500 transition-colors"
-                  title={`Remove ${slot.label}`}
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                  {/* Rating + details */}
+                  <div className="flex items-center gap-3 mt-1">
+                    {item.googleRating && (
+                      <div className="flex items-center gap-1">
+                        <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                        <span className="text-[11px] font-medium text-slate-600">{item.googleRating.toFixed(1)}</span>
+                        {typeof item.googleReviews === 'number' && (
+                          <span className="text-[10px] text-slate-400">({item.googleReviews.toLocaleString()})</span>
+                        )}
+                      </div>
+                    )}
+                    <span className="text-[10px] text-indigo-500 flex items-center gap-0.5">
+                      Details <ChevronRight className="w-3 h-3" />
+                    </span>
+                  </div>
+
+                  {/* Description snippet */}
+                  {item.desc && (
+                    <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">{item.desc}</p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-col items-center gap-1 flex-shrink-0 pt-3">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openSlot(slot.key); }}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                    title={`Change ${slot.label}`}
+                  >
+                    <ArrowLeftRight className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeItem(slot.key); }}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    title={`Remove ${slot.label}`}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -203,7 +262,17 @@ export default function DragDropDayPlanner({ currentDay, plan, setPlan, openSlot
       </div>
 
       {selectedPlace && (
-        <PlaceDetails place={selectedPlace} onClose={() => setSelectedPlace(null)} />
+        <PlaceDetails
+          place={{
+            ...selectedPlace,
+            photos: selectedPlace.photo ? [selectedPlace.photo] : undefined,
+            ratings: {
+              google: selectedPlace.googleRating,
+              googleReviews: selectedPlace.googleReviews,
+            },
+          } as ApiSuggestion}
+          onClose={() => setSelectedPlace(null)}
+        />
       )}
     </div>
   );
